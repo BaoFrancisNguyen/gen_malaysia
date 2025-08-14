@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Malaysia Electricity Generator v3.0 - Refactorisé</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        /* Styles personnalisés épurés */
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            margin: 2rem auto;
+            padding: 2rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            max-width: 1200px;
+        }
+        
+        .section-card {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #dee2e6;
+        }
+        
+        .step-number {
+            background: #007bff;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-waiting { background-color: #6c757d; }
+        .status-loading { background-color: #ffc107; }
+        .status-success { background-color: #28a745; }
+        .status-error { background-color: #dc3545; }
+        
+        .log-container {
+            background: #f1f3f4;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            border: none;
+            padding: 10px 25px;
+            border-radius: 25px;
+            font-weight: 500;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.3);
+        }
+        
+        .export-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .export-card {
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 1rem;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .export-card:hover {
+            border-color: #007bff;
+            transform: translateY(-3px);
+            box-shadow: 0 5px 15px rgba(0,123,255,0.2);
+        }
+        
+        .hidden { display: none; }
+        
+        .alert {
+            border-radius: 10px;
+            border: none;
+            padding: 15px 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- En-tête -->
+        <div class="text-center mb-4">
+            <h1 class="mb-2">🇲🇾 Malaysia Electricity Generator</h1>
+            <p class="lead text-muted">Version 3.0 - Refactorisée et Simplifiée</p>
+            <div class="badge bg-success">4 Fichiers d'Export Distincts + Cartographie</div>
+        </div>
+
+        <!-- Statut de l'application -->
+        <div class="section-card">
+            <h5><span class="step-number">i</span>Statut de l'Application</h5>
+            <div id="app-status">
+                <span class="status-indicator status-loading"></span>
+                <span>Initialisation...</span>
+            </div>
+            <small class="text-muted d-block mt-2">Cache: <span id="cache-info">0 bâtiments, 0 points</span></small>
+        </div>
+
+        <!-- Étape 1: Sélection Zone -->
+        <div class="section-card">
+            <h5><span class="step-number">1</span>Sélection de la Zone Malaysia</h5>
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="zone-select" class="form-label">Choisir une zone :</label>
+                    <select id="zone-select" class="form-select">
+                        <option value="">Chargement des zones...</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <button id="btn-load-buildings" class="btn btn-primary" disabled>
+                        📍 Charger les Bâtiments OSM
+                    </button>
+                </div>
+            </div>
+            <div id="buildings-status" class="mt-3 hidden">
+                <span class="status-indicator status-waiting"></span>
+                <span id="buildings-text">Aucun bâtiment chargé</span>
+            </div>
+            
+            <!-- Carte OSM (conditionnelle) -->
+            <div id="map-container" class="mt-4 hidden">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <h6 class="mb-0">🗺️ Carte des Bâtiments</h6>
+                    <div>
+                        <button id="btn-toggle-map" class="btn btn-outline-secondary btn-sm">
+                            👁️ Masquer la carte
+                        </button>
+                        <span class="badge bg-info ms-2" id="map-building-count">0 bâtiments</span>
+                    </div>
+                </div>
+                <div id="osm-map" style="height: 400px; border-radius: 10px; border: 2px solid #dee2e6;"></div>
+                <small class="text-muted mt-1 d-block">
+                    ℹ️ Carte interactive avec localisation des bâtiments chargés
+                </small>
+            </div>
+            
+            <!-- Message pour Malaysia complète -->
+            <div id="malaysia-full-notice" class="mt-3 alert alert-warning hidden">
+                <strong>🇲🇾 Malaysia Complète Sélectionnée</strong><br>
+                La carte n'est pas affichée pour éviter les problèmes de mémoire avec de très gros volumes de données.
+                Sélectionnez une zone spécifique (Kuala Lumpur, Penang, etc.) pour voir la cartographie.
+            </div>
+        </div>
+
+        <!-- Étape 2: Configuration Génération -->
+        <div class="section-card">
+            <h5><span class="step-number">2</span>Configuration de Génération</h5>
+            
+            <!-- Sélection des types de données -->
+            <div class="row mb-3">
+                <div class="col-12">
+                    <label class="form-label"><strong>Types de données à générer :</strong></label>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="generate-electricity" checked>
+                                <label class="form-check-label" for="generate-electricity">
+                                    ⚡ Consommation Électrique
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="generate-water" checked>
+                                <label class="form-check-label" for="generate-water">
+                                    💧 Consommation Eau
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="generate-weather" checked>
+                                <label class="form-check-label" for="generate-weather">
+                                    🌤️ Données Météo
+                                </label>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="alert alert-warning p-2 mb-0" style="font-size: 0.85em;">
+                                <small>⚠️ Au moins un type requis</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Paramètres temporels -->
+            <div class="row">
+                <div class="col-md-3">
+                    <label for="start-date" class="form-label">Date début :</label>
+                    <input type="date" id="start-date" class="form-control" value="2024-01-01">
+                </div>
+                <div class="col-md-3">
+                    <label for="end-date" class="form-label">Date fin :</label>
+                    <input type="date" id="end-date" class="form-control" value="2024-01-07">
+                </div>
+                <div class="col-md-3">
+                    <label for="frequency" class="form-label">Fréquence :</label>
+                    <select id="frequency" class="form-select">
+                        <option value="15T">15 minutes</option>
+                        <option value="30T">30 minutes</option>
+                        <option value="1H" selected>1 heure</option>
+                        <option value="3H">3 heures</option>
+                        <option value="D">1 jour</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="weather-stations" class="form-label">Stations météo :</label>
+                    <input type="number" id="weather-stations" class="form-control" value="5" min="1" max="20">
+                </div>
+            </div>
+            
+            <div class="mt-3">
+                <button id="btn-generate" class="btn btn-primary" disabled>
+                    🔄 Générer les Données Sélectionnées
+                </button>
+                <span id="generation-preview" class="ms-3 text-muted"></span>
+            </div>
+            <div id="generation-status" class="mt-3 hidden">
+                <span class="status-indicator status-waiting"></span>
+                <span id="generation-text">Génération non démarrée</span>
+            </div>
+        </div>
+
+        <!-- Étape 3: Export des Données -->
+        <div class="section-card">
+            <h5><span class="step-number">3</span>Export des Fichiers Distincts</h5>
+            
+            <div class="alert alert-info">
+                <strong>📋 Fichiers générés selon sélection :</strong><br>
+                • <strong>Métadonnées Bâtiments</strong> : Informations OSM (toujours inclus)<br>
+                • <strong>Consommation Électrique</strong> : Séries temporelles électriques ⚡<br>
+                • <strong>Consommation Eau</strong> : Séries temporelles d'eau 💧<br>
+                • <strong>Simulation Météo</strong> : Données météorologiques (33 colonnes) 🌤️
+            </div>-control" value="2024-01-01">
+                </div>
+                <div class="col-md-3">
+                    <label for="end-date" class="form-label">Date fin :</label>
+                    <input type="date" id="end-date" class="form-control" value="2024-01-07">
+                </div>
+                <div class="col-md-3">
+                    <label for="frequency" class="form-label">Fréquence :</label>
+                    <select id="frequency" class="form-select">
+                        <option value="15T">15 minutes</option>
+                        <option value="30T">30 minutes</option>
+                        <option value="1H" selected>1 heure</option>
+                        <option value="3H">3 heures</option>
+                        <option value="D">1 jour</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label for="weather-stations" class="form-label">Stations météo :</label>
+                    <input type="number" id="weather-stations" class="form-control" value="5" min="1" max="20">
+                </div>
+            </div>
+            <div class="mt-3">
+                <button id="btn-generate" class="btn btn-primary" disabled>
+                    ⚡ Générer les Données (Électricité + Météo)
+                </button>
+            </div>
+            <div id="generation-status" class="mt-3 hidden">
+                <span class="status-indicator status-waiting"></span>
+                <span id="generation-text">Génération non démarrée</span>
+            </div>
+        </div>
+
+        <!-- Étape 3: Export des Données -->
+        <div class="section-card">
+            <h5><span class="step-number">3</span>Export des 3 Fichiers Distincts</h5>
+            
+            <div class="alert alert-info">
+                <strong>📋 Fichiers générés :</strong><br>
+                • <strong>Métadonnées Bâtiments</strong> : Informations OSM des bâtiments<br>
+                • <strong>Consommation Électrique</strong> : Séries temporelles de consommation<br>
+                • <strong>Simulation Météo</strong> : Données météorologiques Malaysia (33 colonnes)
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <label for="export-format" class="form-label">Format d'export :</label>
+                    <select id="export-format" class="form-select">
+                        <option value="csv">CSV (Comma Separated)</option>
+                        <option value="parquet">Parquet (Compressed)</option>
+                        <option value="xlsx">Excel (XLSX)</option>
+                    </select>
+                </div>
+                <div class="col-md-6 d-flex align-items-end">
+                    <button id="btn-export" class="btn btn-primary" disabled>
+                        💾 Exporter les 3 Fichiers
+                    </button>
+                </div>
+            </div>
+            
+            <div id="export-status" class="mt-3 hidden">
+                <span class="status-indicator status-waiting"></span>
+                <span id="export-text">Export non démarré</span>
+            </div>
+            
+            <!-- Zone des fichiers exportés -->
+            <div id="exported-files" class="export-grid hidden">
+                <!-- Les cartes de fichiers seront générées ici -->
+            </div>
+        </div>
+
+        <!-- Console de logs -->
+        <div class="section-card">
+            <h5>📋 Console de Logs</h5>
+            <div id="log-console" class="log-container">
+                <div class="text-muted">Application initialisée. En attente d'actions...</div>
+            </div>
+            <button id="btn-clear-logs" class="btn btn-outline-secondary btn-sm mt-2">
+                🗑️ Effacer les logs
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Leaflet pour la cartographie -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    
+    <script>
+        // ============================================================================
+        // VARIABLES GLOBALES
+        // ============================================================================
+        
+        let appState = {
+            zones: [],
+            currentBuildings: 0,
+            currentConsumption: 0,
+            currentWeather: 0,
+            currentWater: 0,
+            selectedZone: null,
+            map: null,
+            buildingMarkers: [],
+            mapVisible: false
+        };
+
+        // ============================================================================
+        // UTILITAIRES
+        // ============================================================================
+        
+        function logMessage(message, type = 'info') {
+            const logConsole = document.getElementById('log-console');
+            const timestamp = new Date().toLocaleTimeString();
+            const typeIcon = {
+                'info': 'ℹ️',
+                'success': '✅',
+                'error': '❌',
+                'warning': '⚠️'
+            };
+            
+            const logEntry = document.createElement('div');
+            logEntry.innerHTML = `<span class="text-muted">[${timestamp}]</span> ${typeIcon[type]} ${message}`;
+            logEntry.className = `text-${type === 'error' ? 'danger' : type === 'success' ? 'success' : type === 'warning' ? 'warning' : 'dark'}`;
+            
+            logConsole.appendChild(logEntry);
+            logConsole.scrollTop = logConsole.scrollHeight;
+        }
+
+        function updateStatus(elementId, status, text) {
+            const element = document.getElementById(elementId);
+            const indicator = element.querySelector('.status-indicator');
+            const textSpan = element.querySelector('span:last-child');
+            
+            // Reset classes
+            indicator.className = 'status-indicator';
+            indicator.classList.add(`status-${status}`);
+            textSpan.textContent = text;
+            
+            element.classList.remove('hidden');
+        }
+
+        function updateCacheInfo() {
+            const cacheInfo = document.getElementById('cache-info');
+            const parts = [`${appState.currentBuildings} bâtiments`];
+            
+            if (appState.currentConsumption > 0) {
+                parts.push(`${appState.currentConsumption} points électricité`);
+            }
+            if (appState.currentWater > 0) {
+                parts.push(`${appState.currentWater} points eau`);
+            }
+            if (appState.currentWeather > 0) {
+                parts.push(`${appState.currentWeather} points météo`);
+            }
+            
+            cacheInfo.textContent = parts.join(', ');
+        }
+
+        async function apiCall(url, options = {}) {
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...options.headers
+                    },
+                    ...options
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || `HTTP ${response.status}`);
+                }
+                
+                return data;
+            } catch (error) {
+                logMessage(`Erreur API ${url}: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // ============================================================================
+        // INITIALISATION
+        // ============================================================================
+        
+        async function initializeApp() {
+            logMessage('🚀 Initialisation de l\'application...');
+            
+            try {
+                // Vérifier le statut
+                const status = await apiCall('/api/status');
+                
+                updateStatus('app-status', 'success', `Application v${status.version} active`);
+                
+                // Mettre à jour le cache
+                appState.currentBuildings = status.cache.buildings_loaded;
+                appState.currentConsumption = status.cache.consumption_points;
+                appState.currentWeather = status.cache.weather_points;
+                updateCacheInfo();
+                
+                // Charger les zones
+                await loadZones();
+                
+                logMessage('✅ Application initialisée avec succès', 'success');
+                
+            } catch (error) {
+                updateStatus('app-status', 'error', 'Erreur d\'initialisation');
+                logMessage(`Erreur initialisation: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadZones() {
+            try {
+                logMessage('📍 Chargement des zones Malaysia...');
+                
+                const data = await apiCall('/api/zones');
+                appState.zones = data.zones;
+                
+                const zoneSelect = document.getElementById('zone-select');
+                zoneSelect.innerHTML = '<option value="">-- Sélectionner une zone --</option>';
+                
+                data.zones.forEach(zone => {
+                    const option = document.createElement('option');
+                    option.value = zone.id;
+                    option.textContent = zone.name;
+                    zoneSelect.appendChild(option);
+                });
+                
+                logMessage(`✅ ${data.total_zones} zones chargées`, 'success');
+                
+            } catch (error) {
+                logMessage('❌ Erreur chargement zones', 'error');
+            }
+        }
+
+        // ============================================================================
+        // GESTION DES ÉVÉNEMENTS
+        // ============================================================================
+        
+        document.getElementById('zone-select').addEventListener('change', function() {
+            const selectedZone = this.value;
+            appState.selectedZone = selectedZone;
+            
+            const btnLoadBuildings = document.getElementById('btn-load-buildings');
+            btnLoadBuildings.disabled = !selectedZone;
+            
+            if (selectedZone) {
+                logMessage(`🗺️ Zone sélectionnée: ${this.options[this.selectedIndex].text}`);
+            }
+        });
+
+        document.getElementById('btn-load-buildings').addEventListener('click', async function() {
+            if (!appState.selectedZone) return;
+            
+            this.disabled = true;
+            updateStatus('buildings-status', 'loading', 'Chargement des bâtiments OSM...');
+            logMessage(`🏢 Chargement des bâtiments pour: ${appState.selectedZone}`);
+            
+            try {
+                const data = await apiCall(`/api/buildings/${appState.selectedZone}`, {
+                    method: 'POST'
+                });
+                
+                if (data.success) {
+                    appState.currentBuildings = data.metadata.building_count;
+                    updateCacheInfo();
+                    
+                    updateStatus('buildings-status', 'success', 
+                        `${data.metadata.building_count} bâtiments chargés en ${data.metadata.load_time_seconds.toFixed(1)}s`);
+                    
+                    logMessage(`✅ ${data.metadata.building_count} bâtiments OSM chargés`, 'success');
+                    
+                    // Affichage sur la carte (conditionnel)
+                    if (data.buildings && data.buildings.length > 0) {
+                        displayBuildingsOnMap(data.buildings, appState.selectedZone);
+                    }
+                    
+                    // Activer la génération
+                    validateGenerationOptions(); // Recalculer l'état du bouton
+                    
+                } else {
+                    throw new Error(data.error);
+                }
+                
+            } catch (error) {
+                updateStatus('buildings-status', 'error', 'Erreur chargement bâtiments');
+                logMessage(`❌ Erreur chargement: ${error.message}`, 'error');
+                
+            } finally {
+                this.disabled = false;
+            }
+        });
+
+        // Gestionnaire pour basculer l'affichage de la carte
+        document.getElementById('btn-toggle-map').addEventListener('click', toggleMapVisibility);
+
+        // ============================================================================
+        // GESTION DE LA CARTOGRAPHIE
+        // ============================================================================
+        
+        function initializeMap() {
+            if (appState.map) {
+                appState.map.remove();
+            }
+            
+            // Centré sur la Malaysia
+            appState.map = L.map('osm-map').setView([4.2105, 101.9758], 6);
+            
+            // Tuiles OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 18
+            }).addTo(appState.map);
+            
+            // Légende
+            addMapLegend();
+            
+            logMessage('🗺️ Carte initialisée', 'info');
+        }
+        
+        function addMapLegend() {
+            const legend = L.control({position: 'bottomright'});
+            
+            legend.onAdd = function() {
+                const div = L.DomUtil.create('div', 'map-legend');
+                div.innerHTML = `
+                    <h6>Types de Bâtiments</h6>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #28a745;"></div>
+                        <span>Résidentiel</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #007bff;"></div>
+                        <span>Commercial</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #6f42c1;"></div>
+                        <span>Bureau</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #fd7e14;"></div>
+                        <span>Industriel</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #20c997;"></div>
+                        <span>École</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #dc3545;"></div>
+                        <span>Hôpital</span>
+                    </div>
+                `;
+                return div;
+            };
+            
+            legend.addTo(appState.map);
+        }
+        
+        function shouldShowMap(zoneName, buildingCount) {
+            // Ne pas afficher la carte si Malaysia complète ou trop de bâtiments
+            if (zoneName === 'malaysia') {
+                return false;
+            }
+            
+            // Limite de sécurité pour éviter les problèmes de mémoire
+            if (buildingCount > 5000) {
+                return false;
+            }
+            
+            return true;
+        }
+        
+        function displayBuildingsOnMap(buildings, zoneName) {
+            if (!shouldShowMap(zoneName, buildings.length)) {
+                // Afficher le message d'information
+                document.getElementById('malaysia-full-notice').classList.remove('hidden');
+                document.getElementById('map-container').classList.add('hidden');
+                logMessage(`🗺️ Carte désactivée: ${zoneName} (${buildings.length} bâtiments)`, 'warning');
+                return;
+            }
+            
+            // Masquer le message et afficher la carte
+            document.getElementById('malaysia-full-notice').classList.add('hidden');
+            document.getElementById('map-container').classList.remove('hidden');
+            
+            // Initialiser la carte si nécessaire
+            if (!appState.map) {
+                initializeMap();
+            }
+            
+            // Nettoyer les marqueurs existants
+            clearMapMarkers();
+            
+            // Couleurs par type de bâtiment
+            const buildingColors = {
+                'residential': '#28a745',
+                'commercial': '#007bff', 
+                'office': '#6f42c1',
+                'industrial': '#fd7e14',
+                'school': '#20c997',
+                'hospital': '#dc3545'
+            };
+            
+            let bounds = [];
+            
+            // Ajouter les marqueurs (avec limite pour la performance)
+            const maxMarkers = Math.min(buildings.length, 2000);
+            const step = Math.max(1, Math.floor(buildings.length / maxMarkers));
+            
+            for (let i = 0; i < buildings.length; i += step) {
+                const building = buildings[i];
+                
+                if (building.latitude && building.longitude) {
+                    const lat = parseFloat(building.latitude);
+                    const lon = parseFloat(building.longitude);
+                    
+                    // Vérification coordonnées valides
+                    if (!isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+                        const color = buildingColors[building.building_type] || '#6c757d';
+                        
+                        // Créer marqueur personnalisé
+                        const marker = L.circleMarker([lat, lon], {
+                            radius: 4,
+                            fillColor: color,
+                            color: 'white',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                        
+                        // Popup avec informations
+                        const popupContent = `
+                            <div class="building-popup">
+                                <h6>${building.building_type.charAt(0).toUpperCase() + building.building_type.slice(1)}</h6>
+                                <div class="building-details">
+                                    <span><strong>ID:</strong></span>
+                                    <span>${building.id}</span>
+                                    <span><strong>Surface:</strong></span>
+                                    <span>${building.surface_area_m2?.toFixed(1) || 'N/A'} m²</span>
+                                    <span><strong>Zone:</strong></span>
+                                    <span>${building.zone_name || 'N/A'}</span>
+                                    <span><strong>Source:</strong></span>
+                                    <span>${building.source || 'OSM'}</span>
+                                </div>
+                            </div>
+                        `;
+                        
+                        marker.bindPopup(popupContent);
+                        marker.addTo(appState.map);
+                        appState.buildingMarkers.push(marker);
+                        
+                        bounds.push([lat, lon]);
+                    }
+                }
+            }
+            
+            // Ajuster la vue sur les bâtiments
+            if (bounds.length > 0) {
+                appState.map.fitBounds(bounds, {padding: [20, 20]});
+            }
+            
+            // Mettre à jour le compteur
+            document.getElementById('map-building-count').textContent = 
+                `${appState.buildingMarkers.length} bâtiments`;
+            
+            appState.mapVisible = true;
+            
+            logMessage(`🗺️ Carte mise à jour: ${appState.buildingMarkers.length} marqueurs`, 'success');
+        }
+        
+        function clearMapMarkers() {
+            if (appState.buildingMarkers.length > 0) {
+                appState.buildingMarkers.forEach(marker => {
+                    appState.map.removeLayer(marker);
+                });
+                appState.buildingMarkers = [];
+            }
+        }
+        
+        function toggleMapVisibility() {
+            const mapContainer = document.getElementById('map-container');
+            const toggleBtn = document.getElementById('btn-toggle-map');
+            
+            if (appState.mapVisible) {
+                mapContainer.style.display = 'none';
+                toggleBtn.textContent = '👁️ Afficher la carte';
+                appState.mapVisible = false;
+            } else {
+                mapContainer.style.display = 'block';
+                toggleBtn.textContent = '👁️ Masquer la carte';
+                appState.mapVisible = true;
+                
+                // Réinitialiser la taille de la carte
+                if (appState.map) {
+                    setTimeout(() => {
+                        appState.map.invalidateSize();
+                    }, 100);
+                }
+            }
+        }
+        const checkboxes = ['generate-electricity', 'generate-water', 'generate-weather'];
+        
+        checkboxes.forEach(id => {
+            document.getElementById(id).addEventListener('change', function() {
+                updateGenerationPreview();
+                validateGenerationOptions();
+            });
+        });
+
+        function updateGenerationPreview() {
+            const electricity = document.getElementById('generate-electricity').checked;
+            const water = document.getElementById('generate-water').checked;
+            const weather = document.getElementById('generate-weather').checked;
+            
+            const selected = [];
+            if (electricity) selected.push('⚡ Électricité');
+            if (water) selected.push('💧 Eau');
+            if (weather) selected.push('🌤️ Météo');
+            
+            const preview = document.getElementById('generation-preview');
+            if (selected.length > 0) {
+                preview.textContent = `Générera: ${selected.join(', ')}`;
+                preview.className = 'ms-3 text-success';
+            } else {
+                preview.textContent = 'Aucun type sélectionné';
+                preview.className = 'ms-3 text-danger';
+            }
+        }
+
+        function validateGenerationOptions() {
+            const electricity = document.getElementById('generate-electricity').checked;
+            const water = document.getElementById('generate-water').checked;
+            const weather = document.getElementById('generate-weather').checked;
+            
+            const hasSelection = electricity || water || weather;
+            const btnGenerate = document.getElementById('btn-generate');
+            
+            // Le bouton est activé si on a des bâtiments ET au moins une sélection
+            const hasBuildings = appState.currentBuildings > 0;
+            btnGenerate.disabled = !(hasBuildings && hasSelection);
+            
+            return hasSelection;
+        }
+
+        document.getElementById('btn-generate').addEventListener('click', async function() {
+            if (appState.currentBuildings === 0) {
+                logMessage('⚠️ Aucun bâtiment chargé', 'warning');
+                return;
+            }
+            
+            if (!validateGenerationOptions()) {
+                logMessage('⚠️ Sélectionnez au moins un type de données à générer', 'warning');
+                return;
+            }
+            
+            this.disabled = true;
+            updateStatus('generation-status', 'loading', 'Génération en cours...');
+            
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const frequency = document.getElementById('frequency').value;
+            const weatherStations = parseInt(document.getElementById('weather-stations').value);
+            
+            // Récupération des choix utilisateur
+            const generateElectricity = document.getElementById('generate-electricity').checked;
+            const generateWater = document.getElementById('generate-water').checked;
+            const generateWeather = document.getElementById('generate-weather').checked;
+            
+            const selectedTypes = [];
+            if (generateElectricity) selectedTypes.push('électricité');
+            if (generateWater) selectedTypes.push('eau');
+            if (generateWeather) selectedTypes.push('météo');
+            
+            logMessage(`🔄 Génération: ${startDate} → ${endDate} (${frequency})`, 'info');
+            logMessage(`📊 Types sélectionnés: ${selectedTypes.join(', ')}`, 'info');
+            if (generateWeather) {
+                logMessage(`🌤️ ${weatherStations} stations météo`, 'info');
+            }
+            
+            try {
+                const data = await apiCall('/api/generate', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        start_date: startDate,
+                        end_date: endDate,
+                        frequency: frequency,
+                        weather_stations: weatherStations,
+                        generate_electricity: generateElectricity,
+                        generate_water: generateWater,
+                        generate_weather: generateWeather
+                    })
+                });
+                
+                if (data.success) {
+                    // Mise à jour du cache
+                    if (data.summary.consumption_points) {
+                        appState.currentConsumption = data.summary.consumption_points;
+                    }
+                    if (data.summary.weather_points) {
+                        appState.currentWeather = data.summary.weather_points;
+                    }
+                    if (data.summary.water_points) {
+                        appState.currentWater = data.summary.water_points || 0;
+                    }
+                    updateCacheInfo();
+                    
+                    // Message de succès personnalisé
+                    const generatedTypes = [];
+                    if (data.summary.consumption_points > 0) generatedTypes.push(`${data.summary.consumption_points} points électricité`);
+                    if (data.summary.water_points > 0) generatedTypes.push(`${data.summary.water_points} points eau`);
+                    if (data.summary.weather_points > 0) generatedTypes.push(`${data.summary.weather_points} points météo`);
+                    
+                    updateStatus('generation-status', 'success', 
+                        `✅ Généré: ${generatedTypes.join(', ')}`);
+                    
+                    logMessage(`✅ Données générées: ${generatedTypes.join(', ')}`, 'success');
+                    
+                    // Activer l'export
+                    document.getElementById('btn-export').disabled = false;
+                    
+                } else {
+                    throw new Error(data.error);
+                }
+                
+            } catch (error) {
+                updateStatus('generation-status', 'error', 'Erreur génération');
+                logMessage(`❌ Erreur génération: ${error.message}`, 'error');
+                
+            } finally {
+                this.disabled = false;
+            }
+        });
+
+        document.getElementById('btn-export').addEventListener('click', async function() {
+            if (appState.currentConsumption === 0 && appState.currentWeather === 0) {
+                logMessage('⚠️ Aucune donnée à exporter', 'warning');
+                return;
+            }
+            
+            this.disabled = true;
+            updateStatus('export-status', 'loading', 'Export des 3 fichiers en cours...');
+            
+            const exportFormat = document.getElementById('export-format').value;
+            const timestamp = new Date().toISOString().slice(0,16).replace(/[:-]/g, '');
+            
+            logMessage(`💾 Export en format ${exportFormat.toUpperCase()}...`);
+            
+            try {
+                const data = await apiCall('/api/export', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        format: exportFormat,
+                        filename: `malaysia_electricity_${timestamp}`
+                    })
+                });
+                
+                if (data.success) {
+                    updateStatus('export-status', 'success', 
+                        `✅ ${data.metadata.total_files} fichiers exportés (${data.metadata.total_size_mb}MB)`);
+                    
+                    logMessage(`✅ Export réussi: ${data.metadata.total_files} fichiers (${data.metadata.total_size_mb}MB)`, 'success');
+                    
+                    // Afficher les fichiers
+                    displayExportedFiles(data.files);
+                    
+                } else {
+                    throw new Error(data.error);
+                }
+                
+            } catch (error) {
+                updateStatus('export-status', 'error', 'Erreur export');
+                logMessage(`❌ Erreur export: ${error.message}`, 'error');
+                
+            } finally {
+                this.disabled = false;
+            }
+        });
+
+        function displayExportedFiles(files) {
+            const exportedFiles = document.getElementById('exported-files');
+            exportedFiles.innerHTML = '';
+            exportedFiles.classList.remove('hidden');
+            
+            files.forEach(file => {
+                const fileCard = document.createElement('div');
+                fileCard.className = 'export-card';
+                
+                const typeIcons = {
+                    'buildings_metadata': '🏢',
+                    'electricity_consumption': '⚡',
+                    'water_consumption': '💧',
+                    'weather_simulation': '🌤️'
+                };
+                
+                const typeNames = {
+                    'buildings_metadata': 'Métadonnées Bâtiments',
+                    'electricity_consumption': 'Consommation Électrique',
+                    'water_consumption': 'Consommation Eau',
+                    'weather_simulation': 'Simulation Météo'
+                };
+                
+                fileCard.innerHTML = `
+                    <div class="mb-2">
+                        <span style="font-size: 2em;">${typeIcons[file.type] || '📄'}</span>
+                    </div>
+                    <h6>${typeNames[file.type] || file.type}</h6>
+                    <p class="text-muted mb-2">
+                        ${file.records.toLocaleString()} enregistrements<br>
+                        ${file.size_mb.toFixed(2)} MB
+                    </p>
+                    <a href="/api/download/${file.name}" class="btn btn-outline-primary btn-sm">
+                        📥 Télécharger
+                    </a>
+                `;
+                
+                exportedFiles.appendChild(fileCard);
+            });
+        }
+
+        document.getElementById('btn-clear-logs').addEventListener('click', function() {
+            const logConsole = document.getElementById('log-console');
+            logConsole.innerHTML = '<div class="text-muted">Console effacée...</div>';
+        });
+
+        // ============================================================================
+        // INITIALISATION AU CHARGEMENT
+        // ============================================================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            logMessage('🔄 Chargement de la page terminé');
+            initializeApp();
+            
+            // Initialisation des prévisualisations
+            updateGenerationPreview();
+            validateGenerationOptions();
+        });
+
+        // Nettoyage lors de la fermeture de la page
+        window.addEventListener('beforeunload', function() {
+            if (appState.map) {
+                clearMapMarkers();
+                appState.map.remove();
+            }
+        });
+
+        // Mise à jour automatique du statut toutes les 30 secondes
+        setInterval(async function() {
+            try {
+                const status = await apiCall('/api/status');
+                appState.currentBuildings = status.cache.buildings_loaded;
+                appState.currentConsumption = status.cache.consumption_points;
+                appState.currentWeather = status.cache.weather_points;
+                appState.currentWater = status.cache.water_points || 0;
+                updateCacheInfo();
+            } catch (error) {
+                // Ignore silently
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
