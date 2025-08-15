@@ -133,7 +133,7 @@ class MalaysiaConfig:
         'penang': {
             'name': 'Penang',
             'bbox': [100.1, 5.1, 100.6, 5.5],
-            'osm_relation_id': '1876102'
+            'osm_relation_id': '4445131'
         }
     }
     

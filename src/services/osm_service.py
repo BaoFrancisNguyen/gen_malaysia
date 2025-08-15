@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SERVICE OSM - COUCHE SERVICE
-============================
+OSM SERVICE - UTILISE LA MÉTHODE ADMINISTRATIVE
+======================================================
 
-Service métier pour les opérations OSM.
-VERSION CORRIGÉE: Utilise les relations administratives OSM.
+
 """
 
 import logging
@@ -20,18 +19,17 @@ logger = logging.getLogger(__name__)
 
 
 class OSMService:
-    """Service métier pour les opérations OpenStreetMap avec relations administratives"""
+    """Service métier pour les opérations OpenStreetMap avec méthode administrative"""
     
     def __init__(self):
         """Initialise le service OSM"""
         self.osm_handler = OSMHandler()
         self.load_count = 0
-        logger.info("✅ OSMService initialisé (méthode relations administratives)")
+        logger.info("✅ OSMService initialisé avec méthode administrative")
     
     def load_buildings_for_zone(self, zone_name: str) -> Dict:
         """
-        Charge les bâtiments pour une zone Malaysia via relation administrative
-        MÉTHODE ORIGINALE CORRECTE
+        MÉTHODE CORRIGÉE: Utilise la méthode administrative au lieu de bbox
         
         Args:
             zone_name: Nom de la zone (ex: 'kuala_lumpur')
@@ -50,14 +48,9 @@ class OSMService:
                     'available_zones': list(MalaysiaConfig.ZONES.keys())
                 }
             
-            # Récupération de la configuration de zone
-            zone_config = MalaysiaConfig.get_zone_config(zone_name)
-            osm_relation_id = zone_config['osm_relation_id']
-            
-            logger.info(f"🏢 Chargement OSM zone: {zone_config['name']} (relation {osm_relation_id})")
-            
-            # Appel au handler OSM avec relation administrative
-            result = self.osm_handler.fetch_buildings_from_relation(osm_relation_id, zone_name)
+            # 🎯 UTILISATION DE LA MÉTHODE ADMINISTRATIVE
+            logger.info(f"🎯 Chargement administratif pour: {zone_name}")
+            result = self.osm_handler.fetch_buildings_from_relation(zone_name)
             
             if result['success']:
                 # Enrichissement des métadonnées
@@ -75,25 +68,30 @@ class OSMService:
                     'buildings_data': enriched_buildings,  # Pour la cartographie
                     'metadata': {
                         'zone_name': zone_name,
-                        'zone_display_name': zone_config['name'],
-                        'osm_relation_id': osm_relation_id,
+                        'zone_display_name': result.get('metadata', {}).get('zone_name', zone_name),
                         'building_count': len(enriched_buildings),
-                        'load_time_seconds': result['metadata']['query_time_seconds'],
+                        'load_time_seconds': result.get('query_time_seconds', 0),
+                        'method': 'administrative',
+                        'relation_id': result.get('relation_id'),
                         'load_number': self.load_count,
                         'statistics': stats,
                         'loaded_at': datetime.now().isoformat(),
-                        'map_recommended': len(enriched_buildings) <= 5000 and zone_name != 'malaysia',
-                        'method': 'administrative_relation'
+                        'map_recommended': len(enriched_buildings) <= 5000 and zone_name != 'malaysia'
                     }
                 }
             else:
-                return result
+                return {
+                    'success': False,
+                    'error': result.get('error', 'Erreur inconnue'),
+                    'buildings': []
+                }
                 
         except Exception as e:
             logger.error(f"❌ Erreur service OSM: {e}")
             return {
                 'success': False,
-                'error': str(e)
+                'error': str(e),
+                'buildings': []
             }
     
     def _enrich_buildings_metadata(self, buildings: List[Dict], zone_name: str) -> List[Dict]:
@@ -115,141 +113,72 @@ class OSMService:
             enriched_building['zone_name'] = zone_name
             
             # Enrichissement du type de bâtiment
-            building_type = building['building_type']
-            type_config = MalaysiaConfig.get_building_type_config(building_type)
-            enriched_building['building_type_info'] = {
-                'type': building_type,
-                'description': type_config['description'],
-                'base_consumption_kwh_m2_day': type_config['base_consumption_kwh_m2_day'],
-                'base_water_consumption_l_m2_day': type_config['base_water_consumption_l_m2_day']
-            }
+            building_type = building.get('building_type', 'residential')
+            
+            # Configuration basique des types si MalaysiaConfig n'a pas la méthode
+            try:
+                type_config = MalaysiaConfig.get_building_type_config(building_type)
+                enriched_building['building_type_info'] = {
+                    'type': building_type,
+                    'description': type_config['description'],
+                    'base_consumption_kwh_m2_day': type_config['base_consumption_kwh_m2_day']
+                }
+            except:
+                # Configuration par défaut
+                enriched_building['building_type_info'] = {
+                    'type': building_type,
+                    'description': f"Bâtiment {building_type}",
+                    'base_consumption_kwh_m2_day': 1.0
+                }
             
             # Validation et nettoyage des coordonnées
             enriched_building['coordinates'] = {
-                'latitude': round(building['latitude'], 6),
-                'longitude': round(building['longitude'], 6)
+                'latitude': building.get('latitude'),
+                'longitude': building.get('longitude')
             }
             
-            # Formatage de la surface
-            enriched_building['surface_area_m2'] = round(building['surface_area_m2'], 1)
+            # Surface du bâtiment
+            enriched_building['surface_area_m2'] = building.get('surface_area_m2', 100.0)
             
-            # Métadonnées de traitement
-            enriched_building['processing_metadata'] = {
-                'enriched_at': datetime.now().isoformat(),
-                'source_system': 'malaysia_electricity_generator_v3',
-                'extraction_method': 'osm_administrative_relation',
-                'data_quality': self._assess_building_quality(building)
-            }
+            # Identifiants
+            enriched_building['building_id'] = building.get('building_id', f"gen_{len(enriched_buildings)}")
+            enriched_building['osm_id'] = building.get('osm_id')
             
             enriched_buildings.append(enriched_building)
-        
-        return enriched_buildings
-    
-    def _assess_building_quality(self, building: Dict) -> str:
-        """
-        Évalue la qualité des données d'un bâtiment
-        
-        Args:
-            building: Données du bâtiment
             
-        Returns:
-            str: Niveau de qualité ('excellent', 'good', 'acceptable', 'poor')
-        """
-        score = 100
-        
-        # Vérification surface
-        surface = building.get('surface_area_m2', 0)
-        if surface < 20:
-            score -= 20  # Surface très petite
-        elif surface > 10000:
-            score -= 10  # Surface très grande (potentiel outlier)
-        
-        # Vérification coordonnées
-        lat = building.get('latitude', 0)
-        lon = building.get('longitude', 0)
-        if not (0.5 <= lat <= 7.5 and 99.5 <= lon <= 119.5):
-            score -= 30  # Hors limites Malaysia
-        
-        # Vérification tags OSM
-        osm_tags = building.get('osm_tags', {})
-        if not osm_tags or len(osm_tags) < 2:
-            score -= 15  # Peu de métadonnées OSM
-        
-        # Bonus pour extraction via relation administrative
-        if building.get('source') == 'openstreetmap':
-            score += 5  # Méthode plus fiable
-        
-        # Classification qualité
-        if score >= 90:
-            return 'excellent'
-        elif score >= 75:
-            return 'good'
-        elif score >= 60:
-            return 'acceptable'
-        else:
-            return 'poor'
+        return enriched_buildings
     
     def _calculate_zone_statistics(self, buildings: List[Dict]) -> Dict:
         """
-        Calcule les statistiques d'une zone
+        Calcule les statistiques de la zone
         
         Args:
             buildings: Liste des bâtiments
             
         Returns:
-            Dict: Statistiques de la zone
+            Dict: Statistiques calculées
         """
         if not buildings:
-            return {}
+            return {
+                'total_buildings': 0,
+                'building_types': {},
+                'total_surface_m2': 0,
+                'average_surface_m2': 0
+            }
         
-        # Distribution par type
+        # Comptage par type
         type_counts = {}
         total_surface = 0
-        quality_counts = {'excellent': 0, 'good': 0, 'acceptable': 0, 'poor': 0}
         
         for building in buildings:
-            # Comptage par type
-            btype = building['building_type']
-            type_counts[btype] = type_counts.get(btype, 0) + 1
-            
-            # Surface totale
-            total_surface += building['surface_area_m2']
-            
-            # Qualité
-            quality = building['processing_metadata']['data_quality']
-            quality_counts[quality] += 1
-        
-        # Calculs statistiques
-        building_count = len(buildings)
-        avg_surface = total_surface / building_count if building_count > 0 else 0
+            building_type = building.get('building_type', 'unknown')
+            type_counts[building_type] = type_counts.get(building_type, 0) + 1
+            total_surface += building.get('surface_area_m2', 0)
         
         return {
-            'total_buildings': building_count,
-            'total_surface_m2': round(total_surface, 1),
-            'average_surface_m2': round(avg_surface, 1),
-            'building_types_distribution': type_counts,
-            'data_quality_distribution': quality_counts,
-            'quality_percentage': {
-                'high_quality': round((quality_counts['excellent'] + quality_counts['good']) / building_count * 100, 1),
-                'acceptable_quality': round(quality_counts['acceptable'] / building_count * 100, 1),
-                'poor_quality': round(quality_counts['poor'] / building_count * 100, 1)
-            },
-            'extraction_method': 'administrative_relation'
-        }
-    
-    def get_service_statistics(self) -> Dict:
-        """
-        Retourne les statistiques du service
-        
-        Returns:
-            Dict: Statistiques d'utilisation du service
-        """
-        osm_handler_stats = self.osm_handler.get_statistics()
-        
-        return {
-            'service_loads': self.load_count,
-            'osm_handler_stats': osm_handler_stats,
-            'available_zones': list(MalaysiaConfig.ZONES.keys()),
-            'supported_building_types': list(MalaysiaConfig.BUILDING_TYPES.keys()),
-            'method': 'administrative_relations'
+            'total_buildings': len(buildings),
+            'building_types': type_counts,
+            'total_surface_m2': total_surface,
+            'average_surface_m2': total_surface / len(buildings) if buildings else 0,
+            'most_common_type': max(type_counts.items(), key=lambda x: x[1])[0] if type_counts else 'unknown'
         }

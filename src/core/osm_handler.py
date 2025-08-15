@@ -1,376 +1,585 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GESTIONNAIRE OSM - CORE MODULE
-==============================
+OSM HANDLER AVEC SEULEMENT LA MÉTHODE ADMINISTRATIVE
+===================================================
 
-Module core pour la gestion des données OpenStreetMap.
-VERSION CORRIGÉE: Utilise les relations administratives au lieu des bbox.
+UNIQUEMENT la méthode administrative qui fonctionne pour gen_malaysia.
+À remplacer dans src/core/osm_handler.py
 """
 
-import logging
-import time
-from typing import Dict, List, Optional
 import requests
-from datetime import datetime
-
-from config import OSMConfig
-from src.utils.helpers import calculate_approximate_area, generate_building_id
+import json
+import time
+import logging
+import math
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class OSMHandler:
-    """Gestionnaire des opérations OpenStreetMap avec relations administratives"""
+    """
+    Gestionnaire OSM avec UNIQUEMENT la méthode administrative
+    """
     
     def __init__(self):
         """Initialise le gestionnaire OSM"""
-        self.query_count = 0
-        self.total_query_time = 0
-        self.last_query_time = None
-        logger.info("✅ OSMHandler initialisé (méthode relations administratives)")
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Malaysia-Building-Generator-Administrative/2.0'
+        })
+        
+        # APIs Overpass
+        self.overpass_apis = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter',
+            'https://lz4.overpass-api.de/api/interpreter'
+        ]
+        
+        logger.info("✅ OSMHandler initialisé - Méthode administrative SEULEMENT")
     
-    def fetch_buildings_from_relation(self, osm_relation_id: str, zone_name: str) -> Dict:
+    def fetch_buildings_administrative(self, zone_name: str) -> Dict:
         """
-        Récupère les bâtiments depuis une relation administrative OSM
-        MÉTHODE ORIGINALE CORRECTE
+        🥇 MÉTHODE ADMINISTRATIVE: Utilise les relations OSM officielles
         
         Args:
-            osm_relation_id: ID de la relation administrative OSM
-            zone_name: Nom de la zone (pour logs)
+            zone_name: Nom de la zone (ex: 'penang', 'kuala_lumpur')
             
         Returns:
             Dict: Résultat avec bâtiments et métadonnées
         """
         start_time = time.time()
-        self.query_count += 1
+        
+        logger.info(f"🎯 Méthode administrative pour: {zone_name}")
+        
+        # Relations administratives OSM validées (CORRIGÉES)
+        administrative_relations = {
+            # PAYS
+            'malaysia': 2108121,          
+            
+            # TERRITOIRES FÉDÉRAUX 
+            'kuala_lumpur': 2939672,       
+            'putrajaya': 4443881,          
+            'labuan': 4521286,             
+            
+            # ÉTATS 
+            'selangor': 2932285,           
+            'johor': 2939653,              
+            'penang': 4445131,             # CORRIGÉ: Relation valide pour Penang
+            'perak': 4445076,              
+            'sabah': 3879783,              
+            'sarawak': 3879784,            
+            'kedah': 4444908,              
+            'kelantan': 4443571,           
+            'terengganu': 4444411,         
+            'pahang': 4444595,             
+            'perlis': 4444918,             
+            'negeri_sembilan': 2939674,    
+            'melaka': 2939673,             
+        }
+        
+        relation_id = administrative_relations.get(zone_name.lower())
+        
+        if not relation_id:
+            logger.error(f"❌ Pas de relation administrative OSM pour {zone_name}")
+            logger.info(f"📋 Relations disponibles: {list(administrative_relations.keys())}")
+            return {
+                'success': False,
+                'error': f"Relation administrative non disponible pour {zone_name}",
+                'buildings': [],
+                'available_zones': list(administrative_relations.keys())
+            }
+        
+        logger.info(f"🎯 Utilisation relation OSM administrative: {relation_id}")
+        
+        # REQUÊTE OVERPASS CORRIGÉE (syntaxe simplifiée qui FONCTIONNE)
+        query = f"""[out:json][timeout:300];
+relation({relation_id});
+map_to_area->.admin_area;
+way["building"](area.admin_area);
+out geom;"""
+        
+        logger.info(f"📝 Requête administrative: relation({relation_id}) → area → buildings")
         
         try:
-            logger.info(f"🌐 Requête OSM #{self.query_count}: relation {osm_relation_id} ({zone_name})")
+            osm_data = self._execute_query(query.strip())
+            elements = osm_data.get('elements', [])
             
-            # Construction de la requête Overpass avec relation administrative
-            query = self._build_relation_query(osm_relation_id)
+            logger.info(f"📋 Éléments OSM reçus (administrative): {len(elements):,}")
             
-            # Exécution de la requête
-            raw_data = self._execute_overpass_query(query)
-            
-            if not raw_data:
+            if len(elements) == 0:
+                logger.warning("⚠️ Relation administrative trouvée mais aucun bâtiment")
                 return {
                     'success': False,
-                    'error': 'Aucune donnée retournée par Overpass API'
+                    'error': "Relation administrative valide mais sans bâtiments",
+                    'buildings': [],
+                    'relation_id': relation_id
                 }
             
-            # Parsing des données
-            buildings = self._parse_osm_buildings(raw_data, zone_name)
+            buildings = self._process_buildings_data(elements, zone_name)
             
-            # Métadonnées de la requête
-            query_time = time.time() - start_time
-            self.total_query_time += query_time
-            self.last_query_time = datetime.now()
-            
-            logger.info(f"✅ OSM Query #{self.query_count}: {len(buildings)} bâtiments en {query_time:.1f}s")
+            logger.info(f"🏗️ Bâtiments traités (administrative): {len(buildings):,}")
             
             return {
                 'success': True,
                 'buildings': buildings,
+                'total_elements': len(elements),
+                'query_time_seconds': time.time() - start_time,
+                'method_used': 'administrative',
+                'relation_id': relation_id,
                 'metadata': {
-                    'query_count': self.query_count,
-                    'query_time_seconds': query_time,
-                    'osm_relation_id': osm_relation_id,
                     'zone_name': zone_name,
-                    'buildings_found': len(buildings),
-                    'query_timestamp': self.last_query_time.isoformat()
+                    'method': 'administrative',
+                    'relation_id': relation_id,
+                    'query_time_seconds': time.time() - start_time
                 }
             }
             
         except Exception as e:
-            logger.error(f"❌ Erreur requête OSM: {e}")
+            logger.error(f"❌ Erreur méthode administrative: {e}")
             return {
                 'success': False,
-                'error': str(e),
-                'metadata': {
-                    'query_count': self.query_count,
-                    'query_time_seconds': time.time() - start_time
-                }
+                'error': f"Erreur administrative: {str(e)}",
+                'buildings': [],
+                'relation_id': relation_id
             }
     
-    def _build_relation_query(self, osm_relation_id: str) -> str:
+    def _execute_query(self, query: str, max_retries: int = 3) -> Dict:
         """
-        Construit une requête Overpass pour une relation administrative
-        APPROCHE ORIGINALE CORRECTE
+        Exécute une requête Overpass avec retry
         
         Args:
-            osm_relation_id: ID de la relation OSM
+            query: Requête Overpass
+            max_retries: Nombre maximum de tentatives
             
         Returns:
-            str: Requête Overpass QL
+            Dict: Données OSM
         """
-        timeout = OSMConfig.OVERPASS_CONFIG['timeout']
+        last_error = None
         
-        # Requête Overpass avec area() - MÉTHODE ORIGINALE
-        query = f"""[out:json][timeout:{timeout}];
-area(id:{3600000000 + int(osm_relation_id)})->.searchArea;
-(
-  way["building"](area.searchArea);
-  relation["building"](area.searchArea);
-);
-out geom;"""
-        
-        return query
-    
-    def _execute_overpass_query(self, query: str) -> Optional[Dict]:
-        """
-        Exécute une requête Overpass API
-        VERSION AMÉLIORÉE
-        
-        Args:
-            query: Requête Overpass QL
-            
-        Returns:
-            Optional[Dict]: Données JSON ou None si erreur
-        """
-        overpass_urls = [
-            'https://overpass-api.de/api/interpreter',
-            'https://overpass.kumi.systems/api/interpreter'
-        ]
-        
-        headers = {
-            'User-Agent': OSMConfig.OVERPASS_CONFIG['user_agent'],
-            'Accept': 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-        }
-        
-        for url in overpass_urls:
-            try:
-                logger.debug(f"🌐 Tentative requête: {url}")
-                
-                response = requests.post(
-                    url,
-                    data=query.encode('utf-8'),
-                    headers=headers,
-                    timeout=OSMConfig.OVERPASS_CONFIG['timeout']
-                )
-                
-                if response.status_code == 200:
-                    # Vérifier le content-type
-                    content_type = response.headers.get('content-type', '')
-                    if 'application/json' in content_type:
-                        try:
-                            data = response.json()
-                            logger.debug(f"✅ Requête réussie: {len(data.get('elements', []))} éléments")
-                            return data
-                        except ValueError as e:
-                            logger.warning(f"⚠️ Erreur JSON {url}: {e}")
-                            continue
-                    else:
-                        logger.warning(f"⚠️ Réponse non-JSON de {url}: {content_type}")
-                        logger.debug(f"📝 Contenu: {response.text[:300]}...")
-                else:
-                    logger.warning(f"⚠️ HTTP {response.status_code}: {url}")
-                    if response.status_code == 400:
-                        logger.debug(f"📝 Erreur 400: {response.text[:300]}...")
+        for api_url in self.overpass_apis:
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"🌐 Tentative {attempt + 1}/{max_retries} sur {api_url}")
                     
-            except requests.RequestException as e:
-                logger.warning(f"⚠️ Erreur requête {url}: {e}")
-                continue
+                    response = self.session.post(
+                        api_url,
+                        data=query,
+                        timeout=300,
+                        headers={'Content-Type': 'text/plain; charset=utf-8'}
+                    )
+                    
+                    logger.info(f"📡 Statut HTTP: {response.status_code}")
+                    logger.info(f"📊 Taille réponse: {len(response.content)} bytes")
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        elements_count = len(result.get('elements', []))
+                        logger.info(f"✅ Succès: {elements_count} éléments reçus")
+                        return result
+                    else:
+                        logger.warning(f"⚠️ HTTP {response.status_code}: {response.text[:200]}")
+                        last_error = f"HTTP {response.status_code}"
+                        
+                except requests.exceptions.Timeout:
+                    logger.warning(f"⏰ Timeout sur {api_url}")
+                    last_error = "Timeout"
+                    
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"🌐 Erreur réseau sur {api_url}: {e}")
+                    last_error = f"Erreur réseau: {e}"
+                    
+                except json.JSONDecodeError as e:
+                    logger.warning(f"📝 JSON invalide de {api_url}: {e}")
+                    last_error = f"JSON invalide: {e}"
+                    
+                except Exception as e:
+                    logger.warning(f"❌ Erreur inattendue sur {api_url}: {e}")
+                    last_error = f"Erreur inattendue: {e}"
+                
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)  # Backoff exponentiel
         
-        logger.error("❌ Toutes les tentatives Overpass ont échoué")
-        return None
+        raise Exception(f"Toutes les APIs Overpass ont échoué. Dernière erreur: {last_error}")
     
-    def _parse_osm_buildings(self, osm_data: Dict, zone_name: str) -> List[Dict]:
+    def _process_buildings_data(self, elements: List[Dict], zone_name: str) -> List[Dict]:
         """
-        Parse les données OSM brutes en bâtiments
+        Traite les éléments OSM et les convertit en bâtiments
         
         Args:
-            osm_data: Données JSON d'Overpass API
+            elements: Éléments OSM bruts
             zone_name: Nom de la zone
             
         Returns:
-            List[Dict]: Liste des bâtiments parsés
+            List[Dict]: Liste des bâtiments traités
         """
         buildings = []
-        elements = osm_data.get('elements', [])
+        processed_count = 0
+        skipped_count = 0
         
-        logger.info(f"🏗️ Parsing {len(elements)} éléments OSM pour {zone_name}...")
+        logger.info(f"🔄 Traitement de {len(elements):,} éléments OSM")
         
         for element in elements:
+            processed_count += 1
+            
+            # Affichage du progrès pour grandes collections
+            if processed_count % 10000 == 0:
+                logger.info(f"🔄 Progrès: {processed_count:,}/{len(elements):,} éléments traités")
+            
             try:
-                building = self._parse_single_building(element, zone_name)
-                if building:
-                    buildings.append(building)
-                    
+                # Vérifier le type d'élément
+                if element.get('type') != 'way':
+                    skipped_count += 1
+                    continue
+                
+                tags = element.get('tags', {})
+                building_tag = tags.get('building')
+                
+                # Vérifier que c'est bien un bâtiment
+                if not building_tag or building_tag in ['no', 'false']:
+                    skipped_count += 1
+                    continue
+                
+                # Vérifier la géométrie
+                geometry = element.get('geometry', [])
+                if len(geometry) < 3:  # Besoin d'au moins 3 points pour un polygone
+                    skipped_count += 1
+                    continue
+                
+                # Calculer le centre géométrique
+                lats = [coord['lat'] for coord in geometry if 'lat' in coord]
+                lons = [coord['lon'] for coord in geometry if 'lon' in coord]
+                
+                if not lats or not lons or len(lats) < 3:
+                    skipped_count += 1
+                    continue
+                
+                center_lat = sum(lats) / len(lats)
+                center_lon = sum(lons) / len(lons)
+                
+                # Vérifier que les coordonnées sont dans Malaysia
+                if not (0.5 <= center_lat <= 7.5 and 99.0 <= center_lon <= 120.0):
+                    skipped_count += 1
+                    continue
+                
+                # Calculer la surface approximative
+                surface_area = self._calculate_building_area(lats, lons)
+                
+                # Déterminer le type de bâtiment
+                building_type = self._determine_building_type(building_tag, tags)
+                
+                # Créer l'objet bâtiment
+                building = {
+                    'building_id': f"osm_{element.get('id', processed_count)}",
+                    'osm_id': element.get('id'),
+                    'latitude': center_lat,
+                    'longitude': center_lon,
+                    'building_type': building_type,
+                    'surface_area_m2': surface_area,
+                    'zone_name': zone_name,
+                    'source': 'osm_administrative',
+                    'geometry': geometry,
+                    'tags': tags
+                }
+                
+                buildings.append(building)
+                
             except Exception as e:
-                logger.debug(f"⚠️ Erreur parsing élément {element.get('id', 'unknown')}: {e}")
+                logger.debug(f"Erreur traitement élément {processed_count}: {e}")
+                skipped_count += 1
                 continue
         
-        logger.info(f"✅ {len(buildings)} bâtiments parsés avec succès pour {zone_name}")
+        logger.info(f"✅ Traitement terminé: {len(buildings)} bâtiments, {skipped_count} ignorés")
+        
         return buildings
     
-    def _parse_single_building(self, element: Dict, zone_name: str) -> Optional[Dict]:
+    def _calculate_building_area(self, lats: List[float], lons: List[float]) -> float:
         """
-        Parse un seul élément OSM en bâtiment
+        Calcule la surface approximative d'un bâtiment
         
         Args:
-            element: Élément OSM (way ou relation)
-            zone_name: Nom de la zone
+            lats: Latitudes des points
+            lons: Longitudes des points
             
         Returns:
-            Optional[Dict]: Bâtiment parsé ou None
+            float: Surface en m²
         """
-        # Extraction des métadonnées de base
-        osm_id = element.get('id')
-        tags = element.get('tags', {})
+        if len(lats) < 3:
+            return 50.0  # Surface par défaut
         
-        # Vérification que c'est bien un bâtiment
-        if not self._is_building(tags):
-            return None
-        
-        # Extraction de la géométrie
-        geometry_result = self._extract_geometry(element)
-        if not geometry_result:
-            return None
-        
-        center_lat, center_lon, surface_area = geometry_result
-        
-        # Validation coordonnées Malaysia
-        if not self._is_in_malaysia(center_lat, center_lon):
-            return None
-        
-        # Détermination du type de bâtiment
-        building_type = self._determine_building_type(tags)
-        
-        # Génération ID unique
-        building_id = generate_building_id(building_type, zone_name)
-        
-        # Construction de l'objet bâtiment
-        building = {
-            'id': building_id,
-            'osm_id': str(osm_id),
-            'building_type': building_type,
-            'latitude': round(center_lat, 6),
-            'longitude': round(center_lon, 6),
-            'surface_area_m2': round(surface_area, 1),
-            'zone_name': zone_name,
-            'osm_tags': tags,
-            'source': 'openstreetmap',
-            'extracted_at': datetime.now().isoformat()
-        }
-        
-        return building
-    
-    def _is_building(self, tags: Dict) -> bool:
-        """Vérifie si l'élément est un bâtiment"""
-        # Présence du tag building
-        if 'building' in tags and tags['building'] not in ['no', 'false']:
-            return True
-        
-        # Ou certains landuse/amenity
-        landuse = tags.get('landuse', '')
-        amenity = tags.get('amenity', '')
-        
-        building_landuses = ['residential', 'commercial', 'industrial', 'retail']
-        building_amenities = ['school', 'hospital', 'clinic', 'university']
-        
-        return landuse in building_landuses or amenity in building_amenities
-    
-    def _extract_geometry(self, element: Dict) -> Optional[tuple]:
-        """
-        Extrait la géométrie (centre et surface) d'un élément OSM
-        
-        Args:
-            element: Élément OSM
+        try:
+            # Algorithme de Shoelace pour calculer l'aire d'un polygone
+            area = 0.0
+            n = len(lats)
             
-        Returns:
-            Optional[tuple]: (lat, lon, surface_m2) ou None
-        """
-        geometry = element.get('geometry', [])
-        
-        if not geometry:
-            # Fallback pour les éléments sans géométrie détaillée
-            if element.get('lat') and element.get('lon'):
-                return element['lat'], element['lon'], 100.0
-            return None
-        
-        # Extraction des coordonnées
-        coordinates = []
-        for node in geometry:
-            lat = node.get('lat')
-            lon = node.get('lon')
-            if lat is not None and lon is not None:
-                coordinates.append((lat, lon))
-        
-        if len(coordinates) < 1:
-            return None
-        
-        # Calcul du centre géométrique
-        center_lat = sum(coord[0] for coord in coordinates) / len(coordinates)
-        center_lon = sum(coord[1] for coord in coordinates) / len(coordinates)
-        
-        # Calcul de la surface approximative
-        if len(coordinates) >= 3:
-            surface_area = calculate_approximate_area(coordinates)
-        else:
-            surface_area = 100.0  # Surface par défaut pour points isolés
-        
-        return center_lat, center_lon, surface_area
+            for i in range(n):
+                j = (i + 1) % n
+                area += lats[i] * lons[j]
+                area -= lats[j] * lons[i]
+            
+            area = abs(area) / 2.0
+            
+            # Conversion approximative en m² (1 degré ≈ 111km en Malaysia)
+            area_m2 = area * (111000 ** 2)
+            
+            # Limites réalistes pour les bâtiments
+            if area_m2 < 10:
+                return 50.0
+            elif area_m2 > 50000:
+                return 50000.0
+            else:
+                return area_m2
+                
+        except:
+            return 100.0  # Surface par défaut en cas d'erreur
     
-    def _is_in_malaysia(self, lat: float, lon: float) -> bool:
-        """Vérifie si les coordonnées sont en Malaysia"""
-        from config import MalaysiaConfig
-        bounds = MalaysiaConfig.BOUNDS
-        
-        return (bounds['south'] <= lat <= bounds['north'] and 
-                bounds['west'] <= lon <= bounds['east'])
-    
-    def _determine_building_type(self, tags: Dict) -> str:
+    def _determine_building_type(self, building_tag: str, tags: Dict) -> str:
         """
-        Détermine le type de bâtiment depuis les tags OSM
+        Détermine le type de bâtiment à partir des tags OSM
         
         Args:
-            tags: Tags OSM
+            building_tag: Tag building principal
+            tags: Tous les tags OSM
             
         Returns:
             str: Type de bâtiment normalisé
         """
-        building_tag = tags.get('building', '').lower()
-        amenity_tag = tags.get('amenity', '').lower()
-        landuse_tag = tags.get('landuse', '').lower()
+        # Types spécifiques
+        if building_tag in ['house', 'detached', 'terrace', 'apartments', 'residential']:
+            return 'residential'
+        elif building_tag in ['office', 'commercial', 'retail', 'shop']:
+            return 'commercial'
+        elif building_tag in ['industrial', 'warehouse', 'factory']:
+            return 'industrial'
+        elif building_tag in ['school', 'university', 'college']:
+            return 'school'
+        elif building_tag in ['hospital', 'clinic']:
+            return 'hospital'
+        elif building_tag in ['hotel', 'accommodation']:
+            return 'hotel'
+        elif building_tag == 'yes':
+            # Analyser les autres tags
+            if tags.get('amenity') in ['school', 'university']:
+                return 'school'
+            elif tags.get('amenity') in ['hospital', 'clinic']:
+                return 'hospital'
+            elif tags.get('amenity') in ['restaurant', 'cafe', 'shop']:
+                return 'commercial'
+            elif tags.get('landuse') == 'residential':
+                return 'residential'
+            elif tags.get('landuse') == 'industrial':
+                return 'industrial'
+            else:
+                return 'residential'  # Par défaut
+        else:
+            return 'residential'  # Par défaut
         
-        # Mapping tags → types
-        type_mappings = {
-            'residential': ['house', 'residential', 'apartments', 'apartment', 'flat', 'terrace'],
-            'commercial': ['commercial', 'retail', 'shop', 'mall', 'store', 'supermarket'],
-            'office': ['office', 'government', 'civic', 'public'],
-            'industrial': ['industrial', 'warehouse', 'factory', 'manufacturing'],
-            'school': ['school', 'university', 'college', 'kindergarten', 'education'],
-            'hospital': ['hospital', 'clinic', 'healthcare', 'medical']
+    def fetch_buildings_from_relation(self, zone_name: str) -> Dict:
+        """
+        🥇 MÉTHODE ADMINISTRATIVE: Utilise les relations OSM officielles
+        
+        À ajouter dans la classe OSMHandler existante de gen_malaysia
+        """
+        import time
+        start_time = time.time()
+        
+        logger.info(f"🎯 Méthode administrative pour: {zone_name}")
+        
+        # Relations administratives OSM validées (CORRIGÉES)
+        administrative_relations = {
+            # PAYS
+            'malaysia': 2108121,          
+            
+            # TERRITOIRES FÉDÉRAUX 
+            'kuala_lumpur': 2939672,       
+            'putrajaya': 4443881,          
+            'labuan': 4521286,             
+            
+            # ÉTATS 
+            'selangor': 2932285,           
+            'johor': 2939653,              
+            'penang': 4445131,             # CORRIGÉ: Relation valide pour Penang
+            'perak': 4445076,              
+            'sabah': 3879783,              
+            'sarawak': 3879784,            
+            'kedah': 4444908,              
+            'kelantan': 4443571,           
+            'terengganu': 4444411,         
+            'pahang': 4444595,             
+            'perlis': 4444918,             
+            'negeri_sembilan': 2939674,    
+            'melaka': 2939673,             
         }
         
-        # Recherche dans tous les tags
-        all_tag_values = f"{building_tag} {amenity_tag} {landuse_tag}".lower()
+        relation_id = administrative_relations.get(zone_name.lower())
         
-        for building_type, keywords in type_mappings.items():
-            if any(keyword in all_tag_values for keyword in keywords):
-                return building_type
+        if not relation_id:
+            logger.error(f"❌ Pas de relation administrative OSM pour {zone_name}")
+            logger.info(f"📋 Relations disponibles: {list(administrative_relations.keys())}")
+            return {
+                'success': False,
+                'error': f"Relation administrative non disponible pour {zone_name}",
+                'buildings': [],
+                'available_zones': list(administrative_relations.keys())
+            }
         
-        # Type par défaut
-        return 'residential'
-    
-    def get_statistics(self) -> Dict:
+        logger.info(f"🎯 Utilisation relation OSM administrative: {relation_id}")
+        
+        # REQUÊTE OVERPASS CORRIGÉE (syntaxe simplifiée qui FONCTIONNE)
+        query = f"""[out:json][timeout:300];
+    relation({relation_id});
+    map_to_area->.admin_area;
+    way["building"](area.admin_area);
+    out geom;"""
+        
+        logger.info(f"📝 Requête administrative: relation({relation_id}) → area → buildings")
+        
+        try:
+            # Utiliser la méthode _execute_query existante si elle existe
+            # Sinon utiliser requests directement
+            if hasattr(self, '_execute_query'):
+                osm_data = self._execute_query(query.strip())
+            else:
+                osm_data = self._execute_overpass_query_simple(query.strip())
+            
+            elements = osm_data.get('elements', [])
+            
+            logger.info(f"📋 Éléments OSM reçus (administrative): {len(elements):,}")
+            
+            if len(elements) == 0:
+                logger.warning("⚠️ Relation administrative trouvée mais aucun bâtiment")
+                return {
+                    'success': False,
+                    'error': "Relation administrative valide mais sans bâtiments",
+                    'buildings': [],
+                    'relation_id': relation_id
+                }
+            
+            # Utiliser la méthode de traitement existante si elle existe
+            if hasattr(self, '_process_buildings_data'):
+                buildings = self._process_buildings_data(elements, zone_name)
+            else:
+                buildings = self._process_elements_simple(elements, zone_name)
+            
+            logger.info(f"🏗️ Bâtiments traités (administrative): {len(buildings):,}")
+            
+            return {
+                'success': True,
+                'buildings': buildings,
+                'total_elements': len(elements),
+                'query_time_seconds': time.time() - start_time,
+                'method_used': 'administrative',
+                'relation_id': relation_id,
+                'metadata': {
+                    'zone_name': zone_name,
+                    'method': 'administrative',
+                    'relation_id': relation_id,
+                    'query_time_seconds': time.time() - start_time
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Erreur méthode administrative: {e}")
+            return {
+                'success': False,
+                'error': f"Erreur administrative: {str(e)}",
+                'buildings': [],
+                'relation_id': relation_id
+            }
+
+    def _execute_overpass_query_simple(self, query: str) -> Dict:
         """
-        Retourne les statistiques du gestionnaire
-        
-        Returns:
-            Dict: Statistiques d'utilisation
+        Méthode simple d'exécution Overpass si _execute_query n'existe pas
         """
-        avg_query_time = (self.total_query_time / self.query_count 
-                         if self.query_count > 0 else 0)
+        overpass_apis = [
+            'https://overpass-api.de/api/interpreter',
+            'https://overpass.kumi.systems/api/interpreter'
+        ]
         
-        return {
-            'total_queries': self.query_count,
-            'total_query_time_seconds': round(self.total_query_time, 1),
-            'average_query_time_seconds': round(avg_query_time, 1),
-            'last_query_time': self.last_query_time.isoformat() if self.last_query_time else None,
-            'method': 'administrative_relations',
-            'overpass_endpoints': ['overpass-api.de', 'overpass.kumi.systems']
-        }
+        for api_url in overpass_apis:
+            try:
+                response = self.session.post(
+                    api_url,
+                    data=query,
+                    timeout=300,
+                    headers={'Content-Type': 'text/plain; charset=utf-8'}
+                )
+                
+                if response.status_code == 200:
+                    return response.json()
+                    
+            except Exception as e:
+                logger.warning(f"Erreur API {api_url}: {e}")
+                continue
+        
+        raise Exception("Toutes les APIs Overpass ont échoué")
+
+    def _process_elements_simple(self, elements: List[Dict], zone_name: str) -> List[Dict]:
+        """
+        Traitement simple des éléments OSM si _process_buildings_data n'existe pas
+        """
+        buildings = []
+        
+        for i, element in enumerate(elements):
+            try:
+                if element.get('type') != 'way':
+                    continue
+                    
+                tags = element.get('tags', {})
+                building_tag = tags.get('building')
+                
+                if not building_tag or building_tag in ['no', 'false']:
+                    continue
+                    
+                geometry = element.get('geometry', [])
+                if len(geometry) < 3:
+                    continue
+                    
+                # Centre géométrique
+                lats = [coord['lat'] for coord in geometry if 'lat' in coord]
+                lons = [coord['lon'] for coord in geometry if 'lon' in coord]
+                
+                if not lats or not lons:
+                    continue
+                    
+                center_lat = sum(lats) / len(lats)
+                center_lon = sum(lons) / len(lons)
+                
+                # Vérifier Malaysia
+                if not (0.5 <= center_lat <= 7.5 and 99.0 <= center_lon <= 120.0):
+                    continue
+                
+                # Surface approximative
+                surface_area = max(50, min(1000, len(geometry) * 20))
+                
+                # Type de bâtiment
+                if building_tag in ['house', 'residential', 'apartments']:
+                    building_type = 'residential'
+                elif building_tag in ['commercial', 'retail', 'shop']:
+                    building_type = 'commercial'
+                elif building_tag in ['office']:
+                    building_type = 'office'
+                elif building_tag in ['industrial', 'warehouse']:
+                    building_type = 'industrial'
+                else:
+                    building_type = 'residential'
+                
+                building = {
+                    'building_id': f"osm_{element.get('id', i)}",
+                    'osm_id': element.get('id'),
+                    'latitude': center_lat,
+                    'longitude': center_lon,
+                    'building_type': building_type,
+                    'surface_area_m2': surface_area,
+                    'zone_name': zone_name,
+                    'source': 'osm_administrative',
+                    'tags': tags
+                }
+                
+                buildings.append(building)
+                
+            except Exception as e:
+                continue
+        
+        return buildings
