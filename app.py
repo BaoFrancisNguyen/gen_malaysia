@@ -102,7 +102,7 @@ def api_load_buildings(zone_name):
 
 @app.route('/api/generate', methods=['POST'])
 def api_generate_data():
-    """API: Génère les données selon la sélection utilisateur"""
+    """API: Génère les données selon la sélection utilisateur - VERSION CORRIGÉE"""
     try:
         data = request.get_json()
         
@@ -163,8 +163,25 @@ def api_generate_data():
                        f"{result['summary']['consumption_points']} points électricité, "
                        f"{result['summary']['water_points']} points eau, "
                        f"{result['summary']['weather_points']} points météo")
-        
-        return jsonify(result)
+            
+            # CORRECTION: Préparation de la réponse JSON sans les DataFrames
+            response_data = {
+                'success': True,
+                'session_id': result['session_id'],
+                'summary': result['summary'],
+                'generated_types': result['generated_types'],
+                'session_info': {
+                    'session_id': result['session_info']['session_id'],
+                    'generation_time': result['session_info']['generation_time'],
+                    'generation_duration_seconds': result['session_info']['generation_duration_seconds'],
+                    'parameters': result['session_info']['parameters'],
+                    'summary': result['session_info']['summary']
+                }
+            }
+            
+            return jsonify(response_data)
+        else:
+            return jsonify(result)
         
     except Exception as e:
         logger.error(f"Erreur génération: {e}")

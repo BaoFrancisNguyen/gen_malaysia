@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FONCTIONS D'AIDE - UTILS MODULE
-===============================
+FONCTIONS D'AIDE CORRIGÉES - UTILS MODULE
+=========================================
 
-Fonctions utilitaires centralisées. Version optimisée sans redondances.
+Version plus permissive pour les bâtiments OSM.
 """
 
 import os
@@ -21,129 +21,60 @@ from config import AppConfig, MalaysiaConfig, LogConfig, MathConstants
 
 
 # ==============================================================================
-# CONFIGURATION LOGGING (centralisée)
-# ==============================================================================
-
-def setup_logging() -> logging.Logger:
-    """
-    Configure le système de logging de l'application
-    
-    Returns:
-        logging.Logger: Logger configuré
-    """
-    # Créer le dossier logs s'il n'existe pas
-    AppConfig.LOGS_DIR.mkdir(exist_ok=True)
-    
-    # Configuration du logging
-    log_file = AppConfig.LOGS_DIR / 'app.log'
-    
-    logging.basicConfig(
-        level=logging.INFO,
-        format=LogConfig.LOG_FORMAT,
-        datefmt=LogConfig.LOG_DATE_FORMAT,
-        handlers=[
-            logging.FileHandler(log_file, encoding='utf-8'),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-    
-    logger = logging.getLogger('malaysia_electricity_generator')
-    logger.info("✅ Système de logging initialisé")
-    
-    return logger
-
-
-# ==============================================================================
-# GÉNÉRATION D'IDENTIFIANTS (centralisée)
+# GÉNÉRATION D'IDENTIFIANTS (inchangé)
 # ==============================================================================
 
 def generate_unique_id(prefix: str = '', length: int = 8) -> str:
-    """
-    Génère un identifiant unique
-    
-    Args:
-        prefix: Préfixe optionnel
-        length: Longueur de la partie unique
-        
-    Returns:
-        str: Identifiant unique
-    """
+    """Génère un identifiant unique"""
     unique_part = str(uuid.uuid4()).replace('-', '')[:length].upper()
     return f"{prefix}_{unique_part}" if prefix else unique_part
 
 
 def generate_building_id(building_type: str, source: str) -> str:
-    """
-    Génère un ID descriptif pour un bâtiment
-    
-    Args:
-        building_type: Type de bâtiment
-        source: Source des données (ex: 'OSM')
-        
-    Returns:
-        str: ID du bâtiment
-    """
-    # Première lettre du type
+    """Génère un ID descriptif pour un bâtiment"""
     type_prefix = building_type[0].upper() if building_type else 'B'
-    
-    # Code source
     source_code = source[:3].upper() if source else 'SRC'
-    
-    # Partie unique
     unique_part = generate_unique_id(length=6)
-    
     return f"{type_prefix}{source_code}{unique_part}"
 
 
 def generate_session_id() -> str:
-    """
-    Génère un ID de session unique avec timestamp
-    
-    Returns:
-        str: ID de session
-    """
+    """Génère un ID de session unique avec timestamp"""
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     unique_part = generate_unique_id(length=6)
     return f"session_{timestamp}_{unique_part}"
 
 
 # ==============================================================================
-# CALCULS GÉOGRAPHIQUES (centralisés et optimisés)
+# CALCULS GÉOGRAPHIQUES (plus permissifs)
 # ==============================================================================
 
-def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+def validate_malaysia_coordinates(latitude: float, longitude: float) -> bool:
     """
-    Calcule la distance entre deux points en kilomètres (formule haversine)
+    Vérifie si des coordonnées sont dans les limites Malaysia
+    VERSION PLUS PERMISSIVE
     
     Args:
-        lat1, lon1: Coordonnées du premier point
-        lat2, lon2: Coordonnées du second point
+        latitude: Latitude
+        longitude: Longitude
         
     Returns:
-        float: Distance en kilomètres
+        bool: True si dans les limites Malaysia (élarges)
     """
-    # Conversion en radians
-    lat1_rad = math.radians(lat1)
-    lon1_rad = math.radians(lon1)
-    lat2_rad = math.radians(lat2)
-    lon2_rad = math.radians(lon2)
-    
-    # Différences
-    dlat = lat2_rad - lat1_rad
-    dlon = lon2_rad - lon1_rad
-    
-    # Formule haversine
-    a = (math.sin(dlat / 2)**2 + 
-         math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    return MathConstants.EARTH_RADIUS_KM * c
+    try:
+        lat = float(latitude)
+        lon = float(longitude)
+        
+        # Limites élargies pour Malaysia (plus permissives)
+        return (0.0 <= lat <= 8.0 and 99.0 <= lon <= 120.0)
+        
+    except (ValueError, TypeError):
+        return False
 
 
 def calculate_approximate_area(coordinates: List[Tuple[float, float]]) -> float:
     """
-    Calcule une surface approximative en m² depuis une liste de coordonnées
-    VERSION UNIQUE - Supprime les doublons dans building.py
+    Calcule une surface approximative en m² - VERSION ROBUSTE
     
     Args:
         coordinates: Liste de tuples (latitude, longitude)
@@ -151,8 +82,8 @@ def calculate_approximate_area(coordinates: List[Tuple[float, float]]) -> float:
     Returns:
         float: Surface approximative en m²
     """
-    if len(coordinates) < 3:
-        return 50.0  # Surface par défaut pour points isolés
+    if not coordinates or len(coordinates) < 3:
+        return 100.0  # Surface par défaut raisonnable
     
     try:
         # Formule shoelace pour calculer l'aire d'un polygone
@@ -161,67 +92,64 @@ def calculate_approximate_area(coordinates: List[Tuple[float, float]]) -> float:
         
         for i in range(n):
             j = (i + 1) % n
-            area += coordinates[i][0] * coordinates[j][1]
-            area -= coordinates[j][0] * coordinates[i][1]
+            # Protection contre les valeurs nulles
+            if coordinates[i] and coordinates[j] and len(coordinates[i]) >= 2 and len(coordinates[j]) >= 2:
+                area += coordinates[i][0] * coordinates[j][1]
+                area -= coordinates[j][0] * coordinates[i][1]
         
         area = abs(area) / 2.0
         
         # Conversion approximative degrés -> m²
         area_m2 = area * MathConstants.METERS_PER_DEGREE_LAT * MathConstants.METERS_PER_DEGREE_LAT
         
-        # Surface minimale et maximale réalistes
-        return max(min(area_m2, 100000), 10.0)  # Entre 10m² et 100,000m²
+        # Surface réaliste entre 20m² et 50,000m²
+        return max(min(area_m2, 50000), 20.0)
         
-    except Exception:
-        return 50.0  # Valeur par défaut en cas d'erreur
+    except Exception as e:
+        # En cas d'erreur, retourner une surface par défaut
+        return 100.0
 
 
-def calculate_bbox_area(bbox: List[float]) -> float:
+def normalize_building_type(raw_type: str) -> str:
     """
-    Calcule la surface d'une bbox en km²
+    Normalise un type de bâtiment - VERSION TRÈS PERMISSIVE
     
     Args:
-        bbox: [west, south, east, north]
+        raw_type: Type brut (ex: depuis OSM)
         
     Returns:
-        float: Surface en km²
+        str: Type normalisé
     """
-    west, south, east, north = bbox
+    if not raw_type or not isinstance(raw_type, str):
+        return 'residential'  # Par défaut
     
-    # Largeur et hauteur en degrés
-    width_deg = east - west
-    height_deg = north - south
+    raw_lower = raw_type.lower().strip()
     
-    # Conversion approximative
-    width_km = width_deg * 111  # 1° ≈ 111 km
-    height_km = height_deg * 111
-    
-    return width_km * height_km
-
-
-def validate_malaysia_coordinates(latitude: float, longitude: float) -> bool:
-    """
-    Vérifie si des coordonnées sont dans les limites Malaysia
-    VERSION UNIQUE - Centralisée ici, supprime les doublons
-    
-    Args:
-        latitude: Latitude
-        longitude: Longitude
-        
-    Returns:
-        bool: True si dans les limites Malaysia
-    """
-    bounds = MalaysiaConfig.BOUNDS
-    return (bounds['south'] <= latitude <= bounds['north'] and 
-            bounds['west'] <= longitude <= bounds['east'])
+    # Mapping très permissif
+    if any(keyword in raw_lower for keyword in ['house', 'home', 'residential', 'apartment', 'terrace', 'detached']):
+        return 'residential'
+    elif any(keyword in raw_lower for keyword in ['shop', 'store', 'retail', 'commercial', 'mall']):
+        return 'commercial'
+    elif any(keyword in raw_lower for keyword in ['office', 'government', 'civic', 'public']):
+        return 'office'
+    elif any(keyword in raw_lower for keyword in ['factory', 'industrial', 'warehouse', 'manufacture']):
+        return 'industrial'
+    elif any(keyword in raw_lower for keyword in ['school', 'university', 'college', 'education']):
+        return 'school'
+    elif any(keyword in raw_lower for keyword in ['hospital', 'clinic', 'medical', 'health']):
+        return 'hospital'
+    else:
+        return 'residential'  # Par défaut pour tout le reste
 
 
 # ==============================================================================
-# MANIPULATION DE DONNÉES (optimisée)
+# MANIPULATION SÉCURISÉE DE DONNÉES
 # ==============================================================================
 
 def safe_float_parse(value: Any, default: float = 0.0) -> float:
     """Parse une valeur en float de manière sécurisée"""
+    if value is None:
+        return default
     try:
         return float(value)
     except (ValueError, TypeError):
@@ -230,35 +158,153 @@ def safe_float_parse(value: Any, default: float = 0.0) -> float:
 
 def safe_int_parse(value: Any, default: int = 0) -> int:
     """Parse une valeur en int de manière sécurisée"""
+    if value is None:
+        return default
     try:
         return int(value)
     except (ValueError, TypeError):
         return default
 
 
-def chunk_list(data_list: List[Any], chunk_size: int) -> List[List[Any]]:
-    """Divise une liste en chunks de taille donnée"""
-    chunks = []
-    for i in range(0, len(data_list), chunk_size):
-        chunks.append(data_list[i:i + chunk_size])
-    return chunks
+def safe_get_building_field(building: Dict, field: str, default: Any = None) -> Any:
+    """
+    Récupère un champ de bâtiment de manière sécurisée
+    
+    Args:
+        building: Dictionnaire bâtiment
+        field: Nom du champ
+        default: Valeur par défaut
+        
+    Returns:
+        Any: Valeur du champ ou défaut
+    """
+    if not isinstance(building, dict):
+        return default
+    
+    # Essaie plusieurs variantes du nom de champ
+    field_variants = [
+        field,
+        field.lower(),
+        field.upper(),
+        field.replace('_', ''),
+        field.replace('_', '-')
+    ]
+    
+    for variant in field_variants:
+        if variant in building:
+            value = building[variant]
+            if value is not None:
+                return value
+    
+    return default
 
 
-def deep_merge_dict(dict1: Dict, dict2: Dict) -> Dict:
-    """Fusion profonde de deux dictionnaires"""
-    result = dict1.copy()
+def normalize_building_data(building: Dict) -> Dict:
+    """
+    Normalise les données d'un bâtiment pour être plus robuste
     
-    for key, value in dict2.items():
-        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
-            result[key] = deep_merge_dict(result[key], value)
-        else:
-            result[key] = value
+    Args:
+        building: Données bâtiment brutes
+        
+    Returns:
+        Dict: Données bâtiment normalisées
+    """
+    if not isinstance(building, dict):
+        return {
+            'id': generate_unique_id('unknown'),
+            'building_type': 'residential',
+            'latitude': 3.1390,  # KL par défaut
+            'longitude': 101.6869,
+            'surface_area_m2': 100.0,
+            'zone_name': 'unknown',
+            'source': 'unknown'
+        }
     
-    return result
+    # Récupération sécurisée des champs essentiels
+    building_id = (safe_get_building_field(building, 'id') or 
+                  safe_get_building_field(building, 'building_id') or 
+                  safe_get_building_field(building, 'osm_id') or
+                  generate_unique_id('norm'))
+    
+    # Coordonnées avec fallback sur KL
+    latitude = safe_float_parse(safe_get_building_field(building, 'latitude'), 3.1390)
+    longitude = safe_float_parse(safe_get_building_field(building, 'longitude'), 101.6869)
+    
+    # Validation et correction des coordonnées
+    if not validate_malaysia_coordinates(latitude, longitude):
+        latitude = 3.1390   # KL par défaut
+        longitude = 101.6869
+    
+    # Type de bâtiment normalisé
+    raw_type = safe_get_building_field(building, 'building_type', 'residential')
+    building_type = normalize_building_type(raw_type)
+    
+    # Surface avec valeur par défaut raisonnable
+    surface = safe_float_parse(safe_get_building_field(building, 'surface_area_m2'), 100.0)
+    if surface <= 0 or surface > 100000:
+        surface = 100.0
+    
+    # Zone avec fallback
+    zone_name = safe_get_building_field(building, 'zone_name', 'unknown')
+    
+    # Source
+    source = safe_get_building_field(building, 'source', 'osm')
+    
+    return {
+        'id': str(building_id),
+        'building_type': building_type,
+        'latitude': latitude,
+        'longitude': longitude,
+        'surface_area_m2': surface,
+        'zone_name': zone_name,
+        'source': source,
+        'osm_id': safe_get_building_field(building, 'osm_id'),
+        'tags': safe_get_building_field(building, 'tags', {})
+    }
+
+
+def robust_building_list_validation(buildings: List[Dict]) -> List[Dict]:
+    """
+    Valide et normalise une liste de bâtiments de manière très robuste
+    
+    Args:
+        buildings: Liste de bâtiments bruts
+        
+    Returns:
+        List[Dict]: Liste de bâtiments normalisés et valides
+    """
+    if not buildings or not isinstance(buildings, list):
+        return []
+    
+    normalized_buildings = []
+    
+    for i, building in enumerate(buildings):
+        try:
+            # Normalisation robuste
+            normalized = normalize_building_data(building)
+            normalized_buildings.append(normalized)
+            
+        except Exception as e:
+            # En cas d'erreur, créer un bâtiment par défaut
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Erreur normalisation bâtiment {i}: {e}")
+            
+            default_building = {
+                'id': generate_unique_id(f'error_{i}'),
+                'building_type': 'residential',
+                'latitude': 3.1390 + (i % 10) * 0.001,  # Légère variation
+                'longitude': 101.6869 + (i % 10) * 0.001,
+                'surface_area_m2': 100.0,
+                'zone_name': 'unknown',
+                'source': 'error_recovery'
+            }
+            normalized_buildings.append(default_building)
+    
+    return normalized_buildings
 
 
 # ==============================================================================
-# FORMATAGE ET AFFICHAGE (centralisé)
+# UTILITAIRES SYSTÈME ET FORMATAGE (inchangés)
 # ==============================================================================
 
 def format_duration(seconds: float) -> str:
@@ -292,83 +338,30 @@ def format_file_size(size_bytes: int) -> str:
     return f"{s} {size_names[i]}"
 
 
-def format_number(number: float, precision: int = 2) -> str:
-    """Formate un nombre avec séparateurs de milliers"""
-    if precision == 0:
-        return f"{int(number):,}".replace(',', ' ')
-    else:
-        return f"{number:,.{precision}f}".replace(',', ' ')
-
-
-# ==============================================================================
-# UTILITAIRES FICHIERS ET SYSTÈME
-# ==============================================================================
-
-def ensure_directory(directory_path: Path) -> bool:
-    """S'assure qu'un dossier existe"""
-    try:
-        directory_path.mkdir(parents=True, exist_ok=True)
-        return True
-    except Exception as e:
-        logging.error(f"Erreur création dossier {directory_path}: {e}")
-        return False
-
-
 def get_file_size_mb(file_path: Path) -> float:
     """Retourne la taille d'un fichier en MB"""
     try:
         size_bytes = file_path.stat().st_size
-        return size_bytes / (1024 * 1024)  # Conversion directe en MB
+        return size_bytes / (1024 * 1024)
     except Exception:
         return 0.0
 
 
 def clean_filename(filename: str) -> str:
     """Nettoie un nom de fichier en supprimant les caractères interdits"""
-    # Caractères interdits centralisés
     forbidden_chars = '<>:"/\\|?*'
     
     cleaned = filename
     for char in forbidden_chars:
         cleaned = cleaned.replace(char, '_')
     
-    # Suppression des espaces multiples et trim
     cleaned = ' '.join(cleaned.split())
     
     return cleaned
 
 
 # ==============================================================================
-# UTILITAIRES SPÉCIFIQUES MALAYSIA (centralisés)
-# ==============================================================================
-
-def normalize_building_type(raw_type: str) -> str:
-    """
-    Normalise un type de bâtiment vers nos catégories standards
-    VERSION UNIQUE - Supprime le doublon dans building.py
-    
-    Args:
-        raw_type: Type brut (ex: depuis OSM)
-        
-    Returns:
-        str: Type normalisé
-    """
-    if not raw_type:
-        return 'residential'
-    
-    raw_lower = raw_type.lower()
-    
-    # Utilisation de la configuration centralisée
-    for building_type, config in MalaysiaConfig.BUILDING_TYPES.items():
-        osm_tags = config.get('osm_tags', [])
-        if any(tag in raw_lower for tag in osm_tags):
-            return building_type
-    
-    return 'residential'  # Par défaut
-
-
-# ==============================================================================
-# FACTORY PATTERNS POUR MÉTADONNÉES (nouveaux)
+# FACTORY PATTERNS POUR MÉTADONNÉES (inchangés)
 # ==============================================================================
 
 def create_metadata_base() -> Dict:
@@ -380,38 +373,25 @@ def create_metadata_base() -> Dict:
     }
 
 
-def create_session_metadata(session_type: str, **kwargs) -> Dict:
-    """
-    Crée des métadonnées de session standardisées
+def create_success_response(message_code: str, data: Any = None, **kwargs) -> Dict:
+    """Crée une réponse de succès standardisée"""
+    success_message = AppConfig.MESSAGES['success'].get(message_code, message_code)
     
-    Args:
-        session_type: Type de session ('generation', 'export', 'osm')
-        **kwargs: Paramètres additionnels
-        
-    Returns:
-        Dict: Métadonnées de session
-    """
-    metadata = create_metadata_base()
-    metadata.update({
-        'session_id': generate_session_id(),
-        'session_type': session_type,
-        'parameters': kwargs
-    })
-    return metadata
+    response = {
+        'success': True,
+        'message': success_message,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    if data is not None:
+        response['data'] = data
+    
+    response.update(kwargs)
+    return response
 
 
 def create_error_response(error_code: str, details: str = None, **kwargs) -> Dict:
-    """
-    Crée une réponse d'erreur standardisée
-    
-    Args:
-        error_code: Code d'erreur depuis AppConfig.MESSAGES['errors']
-        details: Détails additionnels
-        **kwargs: Données additionnelles
-        
-    Returns:
-        Dict: Réponse d'erreur standardisée
-    """
+    """Crée une réponse d'erreur standardisée"""
     error_message = AppConfig.MESSAGES['errors'].get(error_code, error_code)
     
     response = {
@@ -428,213 +408,27 @@ def create_error_response(error_code: str, details: str = None, **kwargs) -> Dic
     return response
 
 
-def create_success_response(message_code: str, data: Any = None, **kwargs) -> Dict:
-    """
-    Crée une réponse de succès standardisée
-    
-    Args:
-        message_code: Code de message depuis AppConfig.MESSAGES['success']
-        data: Données de réponse
-        **kwargs: Données additionnelles
-        
-    Returns:
-        Dict: Réponse de succès standardisée
-    """
-    success_message = AppConfig.MESSAGES['success'].get(message_code, message_code)
-    
-    response = {
-        'success': True,
-        'message': success_message,
-        'timestamp': datetime.now().isoformat()
-    }
-    
-    if data is not None:
-        response['data'] = data
-    
-    response.update(kwargs)
-    return response
-
-
 # ==============================================================================
-# UTILITAIRES DE PERFORMANCE (optimisés)
+# LOGGING ET SYSTÈME
 # ==============================================================================
 
-def log_performance(func):
-    """Décorateur pour logger les performances d'une fonction"""
-    def wrapper(*args, **kwargs):
-        start_time = datetime.now()
-        logger = logging.getLogger(__name__)
-        
-        try:
-            result = func(*args, **kwargs)
-            execution_time = (datetime.now() - start_time).total_seconds()
-            logger.info(f"⏱️ {func.__name__} exécuté en {format_duration(execution_time)}")
-            return result
-            
-        except Exception as e:
-            execution_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"❌ {func.__name__} échoué après {format_duration(execution_time)}: {e}")
-            raise
+def setup_logging() -> logging.Logger:
+    """Configure le système de logging de l'application"""
+    AppConfig.LOGS_DIR.mkdir(exist_ok=True)
     
-    return wrapper
-
-
-def memory_usage_mb() -> float:
-    """Retourne l'utilisation mémoire actuelle en MB"""
-    try:
-        import psutil
-        process = psutil.Process()
-        return process.memory_info().rss / MathConstants.CONVERSION['bytes_to_mb']
-    except ImportError:
-        return 0.0
-
-
-# ==============================================================================
-# UTILITAIRES DE VALIDATION SIMPLIFIÉS
-# ==============================================================================
-
-def is_valid_date_string(date_string: str) -> bool:
-    """Vérifie si une chaîne est une date valide au format YYYY-MM-DD"""
-    try:
-        datetime.strptime(date_string, '%Y-%m-%d')
-        return True
-    except ValueError:
-        return False
-
-
-def is_valid_frequency(frequency: str) -> bool:
-    """Vérifie si une fréquence est valide"""
-    from config import TimeConfig
-    return frequency in TimeConfig.SUPPORTED_FREQUENCIES
-
-
-# ==============================================================================
-# UTILITAIRES DE CALCUL ÉNERGÉTIQUE (centralisés)
-# ==============================================================================
-
-def calculate_energy_intensity(consumption_kwh: float, surface_m2: float) -> float:
-    """
-    Calcule l'intensité énergétique en kWh/m²
+    log_file = AppConfig.LOGS_DIR / 'app.log'
     
-    Args:
-        consumption_kwh: Consommation en kWh
-        surface_m2: Surface en m²
-        
-    Returns:
-        float: Intensité énergétique
-    """
-    if surface_m2 <= 0:
-        return 0.0
-    return consumption_kwh / surface_m2
-
-
-def calculate_water_intensity(consumption_liters: float, surface_m2: float) -> float:
-    """
-    Calcule l'intensité de consommation d'eau en L/m²
-    
-    Args:
-        consumption_liters: Consommation en litres
-        surface_m2: Surface en m²
-        
-    Returns:
-        float: Intensité eau
-    """
-    if surface_m2 <= 0:
-        return 0.0
-    return consumption_liters / surface_m2
-
-
-def estimate_processing_time(total_points: int, processing_rate: int = 50000) -> float:
-    """
-    Estime le temps de traitement en minutes
-    
-    Args:
-        total_points: Nombre total de points de données
-        processing_rate: Points traités par minute
-        
-    Returns:
-        float: Temps estimé en minutes
-    """
-    return total_points / processing_rate
-
-
-def estimate_memory_usage(total_points: int, bytes_per_point: int = 200) -> float:
-    """
-    Estime l'utilisation mémoire en MB
-    
-    Args:
-        total_points: Nombre total de points
-        bytes_per_point: Bytes par point de données
-        
-    Returns:
-        float: Mémoire estimée en MB
-    """
-    total_bytes = total_points * bytes_per_point
-    return total_bytes / MathConstants.CONVERSION['bytes_to_mb']
-
-
-# ==============================================================================
-# UTILITAIRES DE CONVERSION (centralisés)
-# ==============================================================================
-
-def convert_temperature(temp_celsius: float, to_unit: str = 'kelvin') -> float:
-    """Convertit une température depuis Celsius"""
-    if to_unit == 'kelvin':
-        return temp_celsius + MathConstants.CONVERSION['celsius_to_kelvin']
-    elif to_unit == 'fahrenheit':
-        return temp_celsius * 9/5 + 32
-    else:
-        return temp_celsius
-
-
-def convert_energy(energy_kwh: float, to_unit: str = 'wh') -> float:
-    """Convertit une énergie depuis kWh"""
-    if to_unit == 'wh':
-        return energy_kwh * MathConstants.CONVERSION['kwh_to_wh']
-    elif to_unit == 'mwh':
-        return energy_kwh / 1000
-    else:
-        return energy_kwh
-
-
-# ==============================================================================
-# UTILITAIRES DE DEBUG ET DÉVELOPPEMENT
-# ==============================================================================
-
-def log_system_info():
-    """Log les informations système pour debug"""
-    logger = logging.getLogger(__name__)
-    
-    logger.info("="*50)
-    logger.info("🔧 INFORMATIONS SYSTÈME")
-    logger.info("="*50)
-    logger.info(f"📦 Application: {AppConfig.NAME} v{AppConfig.VERSION}")
-    logger.info(f"🐍 Python: {sys.version}")
-    logger.info(f"💾 Mémoire: {memory_usage_mb():.1f} MB")
-    logger.info(f"📁 Exports: {AppConfig.EXPORTS_DIR}")
-    logger.info(f"📋 Logs: {AppConfig.LOGS_DIR}")
-    logger.info("="*50)
-
-
-def validate_system_requirements() -> Dict:
-    """Valide les prérequis système"""
-    checks = {
-        'python_version': sys.version_info >= (3, 8),
-        'directories_writable': all([
-            AppConfig.EXPORTS_DIR.exists() or AppConfig.EXPORTS_DIR.parent.exists(),
-            AppConfig.LOGS_DIR.exists() or AppConfig.LOGS_DIR.parent.exists()
-        ]),
-        'memory_available': memory_usage_mb() < AppConfig.SYSTEM_LIMITS['max_memory_usage_mb']
-    }
-    
-    return {
-        'all_checks_passed': all(checks.values()),
-        'individual_checks': checks,
-        'recommendations': [
-            "Utilisez Python 3.8 ou supérieur" if not checks['python_version'] else None,
-            "Vérifiez les permissions de dossiers" if not checks['directories_writable'] else None,
-            "Libérez de la mémoire" if not checks['memory_available'] else None
+    logging.basicConfig(
+        level=logging.INFO,
+        format=LogConfig.LOG_FORMAT,
+        datefmt=LogConfig.LOG_DATE_FORMAT,
+        handlers=[
+            logging.FileHandler(log_file, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
         ]
-    }
-    for i in range(0, len(data_list), chunk_size):
-        chunks
+    )
+    
+    logger = logging.getLogger('malaysia_electricity_generator')
+    logger.info("✅ Système de logging initialisé")
+    
+    return logger

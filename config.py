@@ -275,20 +275,21 @@ class WeatherConfig:
         'direct_normal_irradiance', 'terrestrial_radiation', 'location_id'
     ]
     
-    # Paramètres climatiques Malaysia (référence à MalaysiaConfig)
+    # Paramètres climatiques Malaysia - AJOUT DE L'ATTRIBUT MANQUANT
+    CLIMATE_PARAMS = {
+        'base_temperature': 27.0,  # °C
+        'base_humidity': 0.8,      # 80%
+        'base_pressure': 1013.25,  # hPa
+        'temperature_variation': 5.0,  # Variation diurne
+        'seasonal_variation': 2.0,     # Variation saisonnière
+        'precipitation_prob_afternoon': 0.3,
+        'precipitation_prob_night': 0.1
+    }
+    
     @classmethod
     def get_climate_params(cls):
         """Retourne les paramètres climatiques depuis MalaysiaConfig"""
-        climate = MalaysiaConfig.CLIMATE
-        return {
-            'base_temperature': climate['average_temperature'],
-            'base_humidity': climate['average_humidity'],
-            'base_pressure': climate['base_pressure'],
-            'temperature_variation': 5.0,  # Variation diurne
-            'seasonal_variation': 2.0,     # Variation saisonnière
-            'precipitation_prob_afternoon': climate['precipitation_prob_afternoon'],
-            'precipitation_prob_night': climate['precipitation_prob_night']
-        }
+        return cls.CLIMATE_PARAMS
 
 
 # ==============================================================================

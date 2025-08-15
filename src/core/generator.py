@@ -275,167 +275,169 @@ class WeatherGenerator:
             }
     
     def _generate_station_weather_series(
-        self, 
-        date_range: pd.DatetimeIndex, 
-        location_id: int
-    ) -> List[Dict]:
-        """
-        Génère les données météo pour une station
-        
-        Args:
-            date_range: Index temporel
-            location_id: ID de la station
+            self, 
+            date_range: pd.DatetimeIndex, 
+            location_id: int
+        ) -> List[Dict]:
+            """
+            Génère les données météo pour une station - VERSION CORRIGÉE
             
-        Returns:
-            List[Dict]: Observations météorologiques
-        """
-        station_data = []
-        climate = WeatherConfig.CLIMATE_PARAMS
-        
-        for timestamp in date_range:
-            # === TEMPÉRATURE ===
-            # Variation diurne
-            temp_diurnal = climate['temperature_variation'] * np.sin((timestamp.hour - 6) * np.pi / 12)
-            # Variation saisonnière
-            temp_seasonal = climate['seasonal_variation'] * np.sin((timestamp.month - 1) * np.pi / 6)
-            # Bruit aléatoire
-            temp_noise = np.random.normal(0, 1)
+            Args:
+                date_range: Index temporel
+                location_id: ID de la station
+                
+            Returns:
+                List[Dict]: Observations météorologiques
+            """
+            station_data = []
             
-            temperature_2m = climate['base_temperature'] + temp_diurnal + temp_seasonal + temp_noise
+            # CORRECTION: Utilisation de WeatherConfig.CLIMATE_PARAMS
+            climate = WeatherConfig.CLIMATE_PARAMS
             
-            # === HUMIDITÉ ===
-            humidity_variation = 0.1 * np.sin((timestamp.hour - 12) * np.pi / 12)
-            relative_humidity_2m = np.clip(
-                climate['base_humidity'] + humidity_variation + np.random.normal(0, 0.05), 
-                0.5, 1.0
-            )
+            for timestamp in date_range:
+                # === TEMPÉRATURE ===
+                # Variation diurne
+                temp_diurnal = climate['temperature_variation'] * np.sin((timestamp.hour - 6) * np.pi / 12)
+                # Variation saisonnière
+                temp_seasonal = climate['seasonal_variation'] * np.sin((timestamp.month - 1) * np.pi / 6)
+                # Bruit aléatoire
+                temp_noise = np.random.normal(0, 1)
+                
+                temperature_2m = climate['base_temperature'] + temp_diurnal + temp_seasonal + temp_noise
+                
+                # === HUMIDITÉ ===
+                humidity_variation = 0.1 * np.sin((timestamp.hour - 12) * np.pi / 12)
+                relative_humidity_2m = np.clip(
+                    climate['base_humidity'] + humidity_variation + np.random.normal(0, 0.05), 
+                    0.5, 1.0
+                )
+                
+                # === POINT DE ROSÉE ===
+                dew_point_2m = temperature_2m - ((100 - relative_humidity_2m * 100) / 5)
+                
+                # === TEMPÉRATURE APPARENTE ===
+                apparent_temperature = self._calculate_heat_index(temperature_2m, relative_humidity_2m)
+                
+                # === PRÉCIPITATIONS ===
+                precip_prob = (climate['precipitation_prob_afternoon'] 
+                            if 14 <= timestamp.hour <= 18 
+                            else climate['precipitation_prob_night'])
+                
+                precipitation = (np.random.exponential(5) 
+                            if np.random.random() < precip_prob 
+                            else 0)
+                rain = precipitation
+                snowfall = 0  # Pas de neige en Malaysia
+                snow_depth = 0
+                
+                # === CODE MÉTÉO ===
+                if precipitation > 10:
+                    weather_code = 63  # Pluie modérée
+                elif precipitation > 0:
+                    weather_code = 61  # Pluie légère
+                elif relative_humidity_2m > 0.9:
+                    weather_code = 45  # Brouillard
+                else:
+                    weather_code = 0   # Ciel clair
+                
+                # === PRESSION ===
+                pressure_msl = climate['base_pressure'] + np.random.normal(0, 2)
+                surface_pressure = pressure_msl - 5
+                
+                # === COUVERTURE NUAGEUSE ===
+                if precipitation > 0:
+                    cloud_cover = np.random.uniform(80, 100)
+                else:
+                    cloud_cover = np.random.uniform(20, 70)
+                
+                cloud_cover_low = cloud_cover * 0.6
+                cloud_cover_mid = cloud_cover * 0.3
+                cloud_cover_high = cloud_cover * 0.1
+                
+                # === ÉVAPOTRANSPIRATION ===
+                et0_fao_evapotranspiration = np.random.uniform(4, 8)
+                
+                # === DÉFICIT DE PRESSION VAPEUR ===
+                vapour_pressure_deficit = max(0, 2 * (1 - relative_humidity_2m))
+                
+                # === VENT ===
+                wind_speed_10m = np.random.exponential(3)
+                wind_direction_10m = np.random.uniform(0, 360)
+                wind_gusts_10m = wind_speed_10m * np.random.uniform(1.2, 2.0)
+                
+                # === TEMPÉRATURE SOL ===
+                soil_temperature_0_to_7cm = temperature_2m + np.random.normal(0, 1)
+                soil_temperature_7_to_28cm = temperature_2m + np.random.normal(-1, 0.5)
+                
+                # === HUMIDITÉ SOL ===
+                soil_moisture_0_to_7cm = np.random.uniform(0.3, 0.6)
+                soil_moisture_7_to_28cm = np.random.uniform(0.4, 0.7)
+                
+                # === JOUR/NUIT ===
+                is_day = 1 if 6 <= timestamp.hour <= 18 else 0
+                
+                # === ENSOLEILLEMENT ===
+                sunshine_duration = (np.random.uniform(0, 3600) 
+                                if is_day and precipitation == 0 
+                                else 0)
+                
+                # === RADIATION SOLAIRE ===
+                if is_day:
+                    base_radiation = 800 * np.sin((timestamp.hour - 6) * np.pi / 12)
+                    cloud_factor = (100 - cloud_cover) / 100
+                    shortwave_radiation = base_radiation * cloud_factor
+                    direct_radiation = shortwave_radiation * 0.7
+                    diffuse_radiation = shortwave_radiation * 0.3
+                    direct_normal_irradiance = direct_radiation * 1.2
+                else:
+                    shortwave_radiation = 0
+                    direct_radiation = 0
+                    diffuse_radiation = 0
+                    direct_normal_irradiance = 0
+                
+                # === RADIATION TERRESTRE ===
+                terrestrial_radiation = 400 + np.random.normal(0, 20)
+                
+                # === ASSEMBLAGE OBSERVATION ===
+                weather_observation = {
+                    'timestamp': timestamp,
+                    'temperature_2m': round(temperature_2m, 2),
+                    'relative_humidity_2m': round(relative_humidity_2m, 3),
+                    'dew_point_2m': round(dew_point_2m, 2),
+                    'apparent_temperature': round(apparent_temperature, 2),
+                    'precipitation': round(precipitation, 2),
+                    'rain': round(rain, 2),
+                    'snowfall': round(snowfall, 2),
+                    'snow_depth': round(snow_depth, 2),
+                    'weather_code': int(weather_code),
+                    'pressure_msl': round(pressure_msl, 2),
+                    'surface_pressure': round(surface_pressure, 2),
+                    'cloud_cover': round(cloud_cover, 1),
+                    'cloud_cover_low': round(cloud_cover_low, 1),
+                    'cloud_cover_mid': round(cloud_cover_mid, 1),
+                    'cloud_cover_high': round(cloud_cover_high, 1),
+                    'et0_fao_evapotranspiration': round(et0_fao_evapotranspiration, 3),
+                    'vapour_pressure_deficit': round(vapour_pressure_deficit, 3),
+                    'wind_speed_10m': round(wind_speed_10m, 2),
+                    'wind_direction_10m': round(wind_direction_10m, 1),
+                    'wind_gusts_10m': round(wind_gusts_10m, 2),
+                    'soil_temperature_0_to_7cm': round(soil_temperature_0_to_7cm, 2),
+                    'soil_temperature_7_to_28cm': round(soil_temperature_7_to_28cm, 2),
+                    'soil_moisture_0_to_7cm': round(soil_moisture_0_to_7cm, 3),
+                    'soil_moisture_7_to_28cm': round(soil_moisture_7_to_28cm, 3),
+                    'is_day': int(is_day),
+                    'sunshine_duration': round(sunshine_duration, 1),
+                    'shortwave_radiation': round(shortwave_radiation, 2),
+                    'direct_radiation': round(direct_radiation, 2),
+                    'diffuse_radiation': round(diffuse_radiation, 2),
+                    'direct_normal_irradiance': round(direct_normal_irradiance, 2),
+                    'terrestrial_radiation': round(terrestrial_radiation, 2),
+                    'location_id': location_id
+                }
+                
+                station_data.append(weather_observation)
             
-            # === POINT DE ROSÉE ===
-            dew_point_2m = temperature_2m - ((100 - relative_humidity_2m * 100) / 5)
-            
-            # === TEMPÉRATURE APPARENTE ===
-            apparent_temperature = self._calculate_heat_index(temperature_2m, relative_humidity_2m)
-            
-            # === PRÉCIPITATIONS ===
-            precip_prob = (climate['precipitation_prob_afternoon'] 
-                          if 14 <= timestamp.hour <= 18 
-                          else climate['precipitation_prob_night'])
-            
-            precipitation = (np.random.exponential(5) 
-                           if np.random.random() < precip_prob 
-                           else 0)
-            rain = precipitation
-            snowfall = 0  # Pas de neige en Malaysia
-            snow_depth = 0
-            
-            # === CODE MÉTÉO ===
-            if precipitation > 10:
-                weather_code = 63  # Pluie modérée
-            elif precipitation > 0:
-                weather_code = 61  # Pluie légère
-            elif relative_humidity_2m > 0.9:
-                weather_code = 45  # Brouillard
-            else:
-                weather_code = 0   # Ciel clair
-            
-            # === PRESSION ===
-            pressure_msl = climate['base_pressure'] + np.random.normal(0, 2)
-            surface_pressure = pressure_msl - 5
-            
-            # === COUVERTURE NUAGEUSE ===
-            if precipitation > 0:
-                cloud_cover = np.random.uniform(80, 100)
-            else:
-                cloud_cover = np.random.uniform(20, 70)
-            
-            cloud_cover_low = cloud_cover * 0.6
-            cloud_cover_mid = cloud_cover * 0.3
-            cloud_cover_high = cloud_cover * 0.1
-            
-            # === ÉVAPOTRANSPIRATION ===
-            et0_fao_evapotranspiration = np.random.uniform(4, 8)
-            
-            # === DÉFICIT DE PRESSION VAPEUR ===
-            vapour_pressure_deficit = max(0, 2 * (1 - relative_humidity_2m))
-            
-            # === VENT ===
-            wind_speed_10m = np.random.exponential(3)
-            wind_direction_10m = np.random.uniform(0, 360)
-            wind_gusts_10m = wind_speed_10m * np.random.uniform(1.2, 2.0)
-            
-            # === TEMPÉRATURE SOL ===
-            soil_temperature_0_to_7cm = temperature_2m + np.random.normal(0, 1)
-            soil_temperature_7_to_28cm = temperature_2m + np.random.normal(-1, 0.5)
-            
-            # === HUMIDITÉ SOL ===
-            soil_moisture_0_to_7cm = np.random.uniform(0.3, 0.6)
-            soil_moisture_7_to_28cm = np.random.uniform(0.4, 0.7)
-            
-            # === JOUR/NUIT ===
-            is_day = 1 if 6 <= timestamp.hour <= 18 else 0
-            
-            # === ENSOLEILLEMENT ===
-            sunshine_duration = (np.random.uniform(0, 3600) 
-                               if is_day and precipitation == 0 
-                               else 0)
-            
-            # === RADIATION SOLAIRE ===
-            if is_day:
-                base_radiation = 800 * np.sin((timestamp.hour - 6) * np.pi / 12)
-                cloud_factor = (100 - cloud_cover) / 100
-                shortwave_radiation = base_radiation * cloud_factor
-                direct_radiation = shortwave_radiation * 0.7
-                diffuse_radiation = shortwave_radiation * 0.3
-                direct_normal_irradiance = direct_radiation * 1.2
-            else:
-                shortwave_radiation = 0
-                direct_radiation = 0
-                diffuse_radiation = 0
-                direct_normal_irradiance = 0
-            
-            # === RADIATION TERRESTRE ===
-            terrestrial_radiation = 400 + np.random.normal(0, 20)
-            
-            # === ASSEMBLAGE OBSERVATION ===
-            weather_observation = {
-                'timestamp': timestamp,
-                'temperature_2m': round(temperature_2m, 2),
-                'relative_humidity_2m': round(relative_humidity_2m, 3),
-                'dew_point_2m': round(dew_point_2m, 2),
-                'apparent_temperature': round(apparent_temperature, 2),
-                'precipitation': round(precipitation, 2),
-                'rain': round(rain, 2),
-                'snowfall': round(snowfall, 2),
-                'snow_depth': round(snow_depth, 2),
-                'weather_code': int(weather_code),
-                'pressure_msl': round(pressure_msl, 2),
-                'surface_pressure': round(surface_pressure, 2),
-                'cloud_cover': round(cloud_cover, 1),
-                'cloud_cover_low': round(cloud_cover_low, 1),
-                'cloud_cover_mid': round(cloud_cover_mid, 1),
-                'cloud_cover_high': round(cloud_cover_high, 1),
-                'et0_fao_evapotranspiration': round(et0_fao_evapotranspiration, 3),
-                'vapour_pressure_deficit': round(vapour_pressure_deficit, 3),
-                'wind_speed_10m': round(wind_speed_10m, 2),
-                'wind_direction_10m': round(wind_direction_10m, 1),
-                'wind_gusts_10m': round(wind_gusts_10m, 2),
-                'soil_temperature_0_to_7cm': round(soil_temperature_0_to_7cm, 2),
-                'soil_temperature_7_to_28cm': round(soil_temperature_7_to_28cm, 2),
-                'soil_moisture_0_to_7cm': round(soil_moisture_0_to_7cm, 3),
-                'soil_moisture_7_to_28cm': round(soil_moisture_7_to_28cm, 3),
-                'is_day': int(is_day),
-                'sunshine_duration': round(sunshine_duration, 1),
-                'shortwave_radiation': round(shortwave_radiation, 2),
-                'direct_radiation': round(direct_radiation, 2),
-                'diffuse_radiation': round(diffuse_radiation, 2),
-                'direct_normal_irradiance': round(direct_normal_irradiance, 2),
-                'terrestrial_radiation': round(terrestrial_radiation, 2),
-                'location_id': location_id
-            }
-            
-            station_data.append(weather_observation)
-        
-        return station_data
+            return station_data
     
     def _calculate_heat_index(self, temp_c: float, humidity: float) -> float:
         """

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-OSM HANDLER AVEC SEULEMENT LA MÉTHODE ADMINISTRATIVE
+OSM HANDLER AVEC LA MÉTHODE ADMINISTRATIVE
 ===================================================
 
-UNIQUEMENT la méthode administrative qui fonctionne pour gen_malaysia.
-À remplacer dans src/core/osm_handler.py
+
 """
 
 import requests
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class OSMHandler:
     """
-    Gestionnaire OSM avec UNIQUEMENT la méthode administrative
+    Gestionnaire OSM la méthode administrative
     """
     
     def __init__(self):
@@ -41,7 +40,7 @@ class OSMHandler:
     
     def fetch_buildings_administrative(self, zone_name: str) -> Dict:
         """
-        🥇 MÉTHODE ADMINISTRATIVE: Utilise les relations OSM officielles
+        MÉTHODE ADMINISTRATIVE: Utilise les relations OSM officielles
         
         Args:
             zone_name: Nom de la zone (ex: 'penang', 'kuala_lumpur')
@@ -66,7 +65,7 @@ class OSMHandler:
             # ÉTATS 
             'selangor': 2932285,           
             'johor': 2939653,              
-            'penang': 4445131,             # CORRIGÉ: Relation valide pour Penang
+            'penang': 4445131,            
             'perak': 4445076,              
             'sabah': 3879783,              
             'sarawak': 3879784,            
@@ -93,7 +92,7 @@ class OSMHandler:
         
         logger.info(f"🎯 Utilisation relation OSM administrative: {relation_id}")
         
-        # REQUÊTE OVERPASS CORRIGÉE (syntaxe simplifiée qui FONCTIONNE)
+        # REQUÊTE OVERPASS
         query = f"""[out:json][timeout:300];
 relation({relation_id});
 map_to_area->.admin_area;
@@ -399,7 +398,7 @@ out geom;"""
             # ÉTATS 
             'selangor': 2932285,           
             'johor': 2939653,              
-            'penang': 4445131,             # CORRIGÉ: Relation valide pour Penang
+            'penang': 4445131,             
             'perak': 4445076,              
             'sabah': 3879783,              
             'sarawak': 3879784,            
