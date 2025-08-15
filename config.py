@@ -4,7 +4,7 @@
 CONFIGURATION CENTRALISÉE - MALAYSIA ELECTRICITY GENERATOR
 ===========================================================
 
-Configuration centralisée pour éviter les doublons de code.
+Configuration unique et centralisée. Remplace constants.py pour éviter les redondances.
 """
 
 import os
@@ -19,6 +19,11 @@ from datetime import datetime
 class AppConfig:
     """Configuration générale de l'application"""
     
+    # Métadonnées application
+    NAME = 'Malaysia Electricity Data Generator'
+    VERSION = '3.0.0'
+    DESCRIPTION = 'Générateur de données électriques pour Malaysia avec architecture factorisée'
+    
     # Chemins du projet
     PROJECT_ROOT = Path(__file__).parent.absolute()
     EXPORTS_DIR = PROJECT_ROOT / 'exports'
@@ -30,7 +35,50 @@ class AppConfig:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'malaysia-electricity-dev-key')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100MB
     
-    # Création des dossiers
+    # Limites système (centralisées)
+    SYSTEM_LIMITS = {
+        'max_buildings_per_zone': 50000,
+        'max_timeseries_points': 1000000,
+        'max_weather_stations': 50,
+        'max_generation_days': 365,
+        'max_export_file_size_mb': 2000,
+        'max_memory_usage_mb': 4000,
+        'max_processing_time_minutes': 30
+    }
+    
+    # Messages standardisés (fusionnés depuis constants.py)
+    MESSAGES = {
+        'errors': {
+            'invalid_coordinates': "Coordonnées invalides pour Malaysia",
+            'invalid_building_type': "Type de bâtiment non reconnu",
+            'invalid_date_range': "Plage de dates invalide",
+            'invalid_frequency': "Fréquence non supportée",
+            'file_too_large': "Fichier trop volumineux",
+            'missing_required_field': "Champ requis manquant",
+            'data_inconsistent': "Données incohérentes détectées",
+            'generation_failed': "Échec de la génération",
+            'export_failed': "Échec de l'export",
+            'validation_failed': "Validation des données échouée",
+            'insufficient_memory': "Mémoire insuffisante",
+            'timeout_exceeded': "Délai d'attente dépassé"
+        },
+        'success': {
+            'data_generated': "Données générées avec succès",
+            'data_exported': "Données exportées avec succès",
+            'buildings_loaded': "Bâtiments chargés avec succès",
+            'validation_passed': "Validation réussie",
+            'session_completed': "Session terminée avec succès"
+        },
+        'info': {
+            'processing': "Traitement en cours...",
+            'loading_osm': "Chargement des données OSM...",
+            'generating_data': "Génération des données électriques...",
+            'generating_weather': "Génération des données météorologiques...",
+            'exporting_data': "Export des données...",
+            'validating_data': "Validation des données..."
+        }
+    }
+    
     @classmethod
     def init_directories(cls):
         """Crée les dossiers nécessaires"""
@@ -39,18 +87,25 @@ class AppConfig:
 
 
 # ==============================================================================
-# CONFIGURATION MALAYSIA
+# CONFIGURATION MALAYSIA (centralisée et optimisée)
 # ==============================================================================
 
 class MalaysiaConfig:
-    """Configuration spécifique à la Malaysia"""
+    """Configuration spécifique à la Malaysia - VERSION UNIQUE"""
     
-    # Limites géographiques
+    # Limites géographiques (une seule définition)
     BOUNDS = {
-        'north': 7.5,
-        'south': 0.5,
-        'east': 119.5,
-        'west': 99.5
+        'north': 7.5, 'south': 0.5, 'east': 119.5, 'west': 99.5
+    }
+    
+    # Coordonnées principales villes (centralisées)
+    MAJOR_CITIES = {
+        'kuala_lumpur': {'lat': 3.1390, 'lon': 101.6869},
+        'george_town': {'lat': 5.4164, 'lon': 100.3327},
+        'johor_bahru': {'lat': 1.4927, 'lon': 103.7414},
+        'shah_alam': {'lat': 3.0733, 'lon': 101.5185},
+        'kota_kinabalu': {'lat': 5.9804, 'lon': 116.0735},
+        'kuching': {'lat': 1.5533, 'lon': 110.3592}
     }
     
     # Zones administratives
@@ -82,57 +137,87 @@ class MalaysiaConfig:
         }
     }
     
-    # Types de bâtiments avec consommation électrique ET eau
+    # Types de bâtiments UNIFIÉS (électricité + eau)
     BUILDING_TYPES = {
         'residential': {
             'base_consumption_kwh_m2_day': 0.8,
             'base_water_consumption_l_m2_day': 150,
             'osm_tags': ['residential', 'house', 'apartments', 'terrace'],
-            'description': 'Bâtiments résidentiels'
+            'description': 'Bâtiments résidentiels',
+            'typical_size_m2': (50, 300),
+            'occupancy_hours': (16, 24)
         },
         'commercial': {
             'base_consumption_kwh_m2_day': 1.5,
             'base_water_consumption_l_m2_day': 80,
             'osm_tags': ['commercial', 'retail', 'shop', 'mall'],
-            'description': 'Bâtiments commerciaux'
+            'description': 'Bâtiments commerciaux',
+            'typical_size_m2': (100, 2000),
+            'occupancy_hours': (10, 14)
         },
         'office': {
             'base_consumption_kwh_m2_day': 2.0,
             'base_water_consumption_l_m2_day': 60,
             'osm_tags': ['office', 'government', 'civic'],
-            'description': 'Bureaux et administrations'
+            'description': 'Bureaux et administrations',
+            'typical_size_m2': (200, 5000),
+            'occupancy_hours': (8, 10)
         },
         'industrial': {
             'base_consumption_kwh_m2_day': 3.5,
             'base_water_consumption_l_m2_day': 200,
             'osm_tags': ['industrial', 'warehouse', 'factory'],
-            'description': 'Bâtiments industriels'
+            'description': 'Bâtiments industriels',
+            'typical_size_m2': (500, 10000),
+            'occupancy_hours': (16, 24)
         },
         'school': {
             'base_consumption_kwh_m2_day': 1.2,
             'base_water_consumption_l_m2_day': 100,
             'osm_tags': ['school', 'university', 'college'],
-            'description': 'Établissements scolaires'
+            'description': 'Établissements scolaires',
+            'typical_size_m2': (300, 3000),
+            'occupancy_hours': (8, 12)
         },
         'hospital': {
             'base_consumption_kwh_m2_day': 4.0,
             'base_water_consumption_l_m2_day': 300,
             'osm_tags': ['hospital', 'clinic', 'healthcare'],
-            'description': 'Établissements de santé'
+            'description': 'Établissements de santé',
+            'typical_size_m2': (1000, 20000),
+            'occupancy_hours': (24, 24)
         }
+    }
+    
+    # Classes d'efficacité énergétique
+    ENERGY_EFFICIENCY_CLASSES = {
+        'A': {'factor': 0.7, 'description': 'Très efficace'},
+        'B': {'factor': 0.85, 'description': 'Efficace'},
+        'C': {'factor': 1.0, 'description': 'Standard'},
+        'D': {'factor': 1.15, 'description': 'Peu efficace'},
+        'E': {'factor': 1.3, 'description': 'Inefficace'}
+    }
+    
+    # Paramètres climatiques (centralisés)
+    CLIMATE = {
+        'average_temperature': 27.0,  # °C
+        'temperature_range': (24, 34),
+        'average_humidity': 0.8,  # 80%
+        'humidity_range': (0.6, 0.95),
+        'base_pressure': 1013.25,  # hPa
+        'precipitation_prob_afternoon': 0.3,
+        'precipitation_prob_night': 0.1,
+        'dry_season_months': [6, 7, 8],
+        'wet_season_months': [11, 12, 1, 2]
     }
     
     @classmethod
     def get_all_zones_list(cls):
         """Retourne la liste formatée des zones"""
-        zones = []
-        for zone_id, zone_config in cls.ZONES.items():
-            zones.append({
-                'id': zone_id,
-                'name': zone_config['name'],
-                'bbox': zone_config['bbox']
-            })
-        return zones
+        return [
+            {'id': zone_id, 'name': zone_config['name'], 'bbox': zone_config['bbox']}
+            for zone_id, zone_config in cls.ZONES.items()
+        ]
     
     @classmethod
     def get_zone_config(cls, zone_name):
@@ -146,14 +231,38 @@ class MalaysiaConfig:
 
 
 # ==============================================================================
+# CONFIGURATION TEMPORELLE ET FRÉQUENCES
+# ==============================================================================
+
+class TimeConfig:
+    """Configuration temporelle centralisée"""
+    
+    # Fuseaux horaires
+    MALAYSIA_TIMEZONE = 'Asia/Kuala_Lumpur'
+    MALAYSIA_UTC_OFFSET = '+08:00'
+    
+    # Fréquences supportées (une seule définition)
+    SUPPORTED_FREQUENCIES = {
+        '15T': {'description': '15 minutes', 'points_per_day': 96, 'recommended_max_days': 7},
+        '30T': {'description': '30 minutes', 'points_per_day': 48, 'recommended_max_days': 14},
+        '1H': {'description': '1 heure', 'points_per_day': 24, 'recommended_max_days': 30},
+        '3H': {'description': '3 heures', 'points_per_day': 8, 'recommended_max_days': 90},
+        '6H': {'description': '6 heures', 'points_per_day': 4, 'recommended_max_days': 180},
+        'D': {'description': '1 jour', 'points_per_day': 1, 'recommended_max_days': 365}
+    }
+    
+    DEFAULT_FREQUENCY = '1H'
+
+
+# ==============================================================================
 # CONFIGURATION MÉTÉO
 # ==============================================================================
 
 class WeatherConfig:
-    """Configuration pour la génération météorologique"""
+    """Configuration météorologique optimisée"""
     
-    # Colonnes météo (33 colonnes spécifiées)
-    WEATHER_COLUMNS = [
+    # Colonnes météo (33 colonnes définitives)
+    COLUMNS = [
         'timestamp', 'temperature_2m', 'relative_humidity_2m', 'dew_point_2m',
         'apparent_temperature', 'precipitation', 'rain', 'snowfall', 'snow_depth',
         'weather_code', 'pressure_msl', 'surface_pressure', 'cloud_cover',
@@ -166,16 +275,20 @@ class WeatherConfig:
         'direct_normal_irradiance', 'terrestrial_radiation', 'location_id'
     ]
     
-    # Paramètres climatiques Malaysia (tropical)
-    CLIMATE_PARAMS = {
-        'base_temperature': 27.0,  # °C
-        'base_humidity': 0.8,      # 80%
-        'base_pressure': 1013.25,  # hPa
-        'temperature_variation': 5.0,  # Variation diurne
-        'seasonal_variation': 2.0,     # Variation saisonnière
-        'precipitation_prob_afternoon': 0.3,  # Probabilité pluie après-midi
-        'precipitation_prob_night': 0.1       # Probabilité pluie nuit
-    }
+    # Paramètres climatiques Malaysia (référence à MalaysiaConfig)
+    @classmethod
+    def get_climate_params(cls):
+        """Retourne les paramètres climatiques depuis MalaysiaConfig"""
+        climate = MalaysiaConfig.CLIMATE
+        return {
+            'base_temperature': climate['average_temperature'],
+            'base_humidity': climate['average_humidity'],
+            'base_pressure': climate['base_pressure'],
+            'temperature_variation': 5.0,  # Variation diurne
+            'seasonal_variation': 2.0,     # Variation saisonnière
+            'precipitation_prob_afternoon': climate['precipitation_prob_afternoon'],
+            'precipitation_prob_night': climate['precipitation_prob_night']
+        }
 
 
 # ==============================================================================
@@ -183,32 +296,39 @@ class WeatherConfig:
 # ==============================================================================
 
 class ExportConfig:
-    """Configuration pour l'export des données"""
+    """Configuration export centralisée et optimisée"""
     
-    # Formats supportés
+    # Formats supportés (unique)
     SUPPORTED_FORMATS = ['csv', 'parquet', 'xlsx']
     
-    # Noms de fichiers par défaut
+    # Noms de fichiers standardisés
     DEFAULT_FILENAMES = {
         'buildings': 'buildings_metadata',
         'consumption': 'electricity_consumption', 
+        'water': 'water_consumption',
         'weather': 'weather_simulation'
     }
     
-    # Configuration par format
+    # Configuration par format (centralisée)
     FORMAT_CONFIG = {
         'csv': {
             'separator': ',',
             'encoding': 'utf-8',
-            'extension': '.csv'
+            'extension': '.csv',
+            'date_format': '%Y-%m-%d %H:%M:%S',
+            'mime_type': 'text/csv'
         },
         'parquet': {
             'compression': 'snappy',
-            'extension': '.parquet'
+            'extension': '.parquet',
+            'engine': 'pyarrow',
+            'mime_type': 'application/octet-stream'
         },
         'xlsx': {
             'sheet_name': 'Data',
-            'extension': '.xlsx'
+            'extension': '.xlsx',
+            'engine': 'openpyxl',
+            'mime_type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         }
     }
     
@@ -225,35 +345,89 @@ class ExportConfig:
 # ==============================================================================
 
 class OSMConfig:
-    """Configuration pour OpenStreetMap"""
+    """Configuration OpenStreetMap centralisée"""
     
     # Configuration Overpass API
     OVERPASS_CONFIG = {
         'timeout': 60,
-        'user_agent': 'Malaysia-Electricity-Generator/3.0'
+        'user_agent': f'{AppConfig.NAME}/{AppConfig.VERSION}'
     }
     
-    # Tags OSM à rechercher
-    BUILDING_QUERY_TAGS = [
-        'building~"."',
-        'landuse~"residential|commercial|industrial"'
-    ]
+    # Endpoints API (centralisés)
+    API_ENDPOINTS = {
+        'overpass_primary': 'https://overpass-api.de/api/interpreter',
+        'overpass_backup': 'https://overpass.kumi.systems/api/interpreter',
+        'nominatim': 'https://nominatim.openstreetmap.org/'
+    }
+    
+    # Headers HTTP standardisés
+    HTTP_HEADERS = {
+        'User-Agent': f'{AppConfig.NAME}/{AppConfig.VERSION} (Research Project)',
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate'
+    }
     
     @classmethod
     def build_overpass_query(cls, bbox):
-        """Construit une requête Overpass"""
-        south, west, north, east = bbox
+        """Construit une requête Overpass optimisée - VERSION CORRIGÉE"""
+        west, south, east, north = bbox
         
-        query = f"""
-        [out:json][timeout:{cls.OVERPASS_CONFIG['timeout']}];
-        (
-          way["building"~"."](bbox:{south},{west},{north},{east});
-          relation["building"~"."](bbox:{south},{west},{north},{east});
-        );
-        out geom;
-        """
+        # Requête Overpass QL corrigée avec syntaxe valide
+        query = f"""[out:json][timeout:{cls.OVERPASS_CONFIG['timeout']}];
+    (
+    way["building"](bbox:{south},{west},{north},{east});
+    relation["building"](bbox:{south},{west},{north},{east});
+    );
+    out geom;"""
+        
         return query
 
 
-# Initialisation des dossiers au chargement du module
+
+# ==============================================================================
+# CONFIGURATION LOGGING
+# ==============================================================================
+
+class LogConfig:
+    """Configuration logging centralisée"""
+    
+    # Format et niveaux
+    LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
+    
+    # Tailles limites
+    LOG_MAX_SIZE_MB = 10
+    LOG_BACKUP_COUNT = 5
+    
+    # Niveaux disponibles
+    LEVELS = {
+        'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50
+    }
+
+
+# ==============================================================================
+# CONSTANTES MATHÉMATIQUES
+# ==============================================================================
+
+class MathConstants:
+    """Constantes mathématiques et scientifiques centralisées"""
+    
+    # Constantes physiques
+    EARTH_RADIUS_KM = 6371.0
+    DEGREES_TO_RADIANS = 0.017453292519943295
+    METERS_PER_DEGREE_LAT = 111000
+    
+    # Facteurs de conversion
+    CONVERSION = {
+        'kwh_to_wh': 1000,
+        'celsius_to_kelvin': 273.15,
+        'bytes_to_mb': 1024 * 1024,
+        'mm_to_m': 0.001
+    }
+    
+    # Préfixes de taille
+    SIZE_PREFIXES = ['B', 'KB', 'MB', 'GB', 'TB']
+
+
+# Initialisation automatique des dossiers
 AppConfig.init_directories()

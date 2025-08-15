@@ -176,7 +176,7 @@ def create_template_if_missing():
             <h4>Architecture Factorisée Active</h4>
             <p><strong>✨ Caractéristiques:</strong></p>
             <ul class="list-unstyled">
-                <li>📁 3 fichiers d'export distincts</li>
+                <li>📁 4 fichiers d'export distincts</li>
                 <li>🏗️ Architecture modulaire propre</li>
                 <li>⚡ Séparation des responsabilités</li>
                 <li>🔧 Code factorisation correcte</li>
@@ -187,7 +187,7 @@ def create_template_if_missing():
                 <li><code>GET /api/zones</code> - Liste des zones Malaysia</li>
                 <li><code>POST /api/buildings/&lt;zone&gt;</code> - Charger bâtiments OSM</li>
                 <li><code>POST /api/generate</code> - Générer données électriques + météo</li>
-                <li><code>POST /api/export</code> - Exporter les 3 fichiers</li>
+                <li><code>POST /api/export</code> - Exporter les fichiers</li>
                 <li><code>GET /api/status</code> - Statut de l'application</li>
             </ul>
             
@@ -268,9 +268,10 @@ def main():
         print("   🛠️ Utils: helpers, validators centralisés")
         print("   ⚙️ Config: configuration centralisée")
         print()
-        print("📤 3 FICHIERS D'EXPORT DISTINCTS:")
+        print("📤 4 FICHIERS D'EXPORT DISTINCTS:")
         print("   • buildings_metadata - Métadonnées bâtiments OSM")
         print("   • electricity_consumption - Séries temporelles électriques") 
+        print("   • water_consumption - Séries temporelles eau")
         print("   • weather_simulation - Données météo (33 colonnes)")
         print()
         print("🌐 URL: http://127.0.0.1:5000")
@@ -303,133 +304,6 @@ def main():
         import traceback
         traceback.print_exc()
         print("\n💡 Vérifiez que l'architecture factorisée est complète")
-        sys.exit(1)
-
-
-if __name__ == '__main__':
-    main() Créer un template minimal
-    minimal_template = '''<!DOCTYPE html>
-<html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Malaysia Electricity Generator v3.0</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-5">
-        <h1 class="text-center">🇲🇾 Malaysia Electricity Generator v3.0</h1>
-        <div class="alert alert-info text-center">
-            <h4>Application Refactorisée Active</h4>
-            <p>Utilisez l'API REST pour interagir avec l'application :</p>
-            <ul class="list-unstyled">
-                <li><code>GET /api/zones</code> - Liste des zones</li>
-                <li><code>POST /api/buildings/&lt;zone&gt;</code> - Charger bâtiments</li>
-                <li><code>POST /api/generate</code> - Générer données</li>
-                <li><code>POST /api/export</code> - Exporter fichiers</li>
-                <li><code>GET /api/status</code> - Statut application</li>
-            </ul>
-            <button onclick="testAPI()" class="btn btn-primary">Tester l'API</button>
-            <div id="result" class="mt-3"></div>
-        </div>
-    </div>
-    
-    <script>
-        async function testAPI() {
-            try {
-                const response = await fetch('/api/status');
-                const data = await response.json();
-                document.getElementById('result').innerHTML = 
-                    `<div class="alert alert-success">✅ API Active v${data.version}</div>`;
-            } catch (error) {
-                document.getElementById('result').innerHTML = 
-                    `<div class="alert alert-danger">❌ Erreur: ${error}</div>`;
-            }
-        }
-    </script>
-</body>
-</html>'''
-    
-    try:
-        with open(template_file, 'w', encoding='utf-8') as f:
-            f.write(minimal_template)
-        print("✅ Template minimal créé")
-        return True
-    except Exception as e:
-        print(f"❌ Erreur création template: {e}")
-        return False
-
-
-def main():
-    """Fonction principale de démarrage"""
-    print("="*60)
-    print("🇲🇾 MALAYSIA ELECTRICITY GENERATOR v3.0 - REFACTORISÉ")
-    print("="*60)
-    print("🔍 Vérification de l'environnement...")
-    print()
-    
-    # Vérifications préalables
-    if not check_python_version():
-        sys.exit(1)
-    
-    if not check_dependencies():
-        print("\n💡 Installez les dépendances et relancez")
-        sys.exit(1)
-    
-    if not create_project_structure():
-        sys.exit(1)
-    
-    if not check_app_file():
-        print("\n💡 Utilisez le fichier app.py refactorisé")
-        sys.exit(1)
-    
-    create_template_if_missing()
-    
-    print("\n" + "="*60)
-    print("🚀 DÉMARRAGE DE L'APPLICATION")
-    print("="*60)
-    
-    try:
-        # Import et démarrage
-        from app import app
-        
-        print("✅ Application Flask importée")
-        print("\n📋 FONCTIONNALITÉS REFACTORISÉES:")
-        print("   • Code propre et factorisation correcte")
-        print("   • 3 fichiers d'export distincts:")
-        print("     - Métadonnées bâtiments OSM")
-        print("     - Consommation électrique temporelle") 
-        print("     - Simulation météorologique (33 colonnes)")
-        print("   • API REST simplifiée")
-        print("   • Interface web épurée")
-        print("   • Suppression du code superflu")
-        print()
-        print("🌐 URL: http://127.0.0.1:5000")
-        print("📁 Exports: exports/")
-        print("📋 Logs: logs/")
-        print()
-        print("▶️  Ctrl+C pour arrêter")
-        print("="*60)
-        
-        # Lancement serveur Flask
-        app.run(
-            host='127.0.0.1',
-            port=5000,
-            debug=True,
-            threaded=True
-        )
-        
-    except ImportError as e:
-        print(f"❌ Erreur import app: {e}")
-        print("💡 Vérifiez que app.py contient le code refactorisé")
-        sys.exit(1)
-        
-    except KeyboardInterrupt:
-        print("\n\n👋 Arrêt de l'application")
-        
-    except Exception as e:
-        print(f"\n❌ Erreur démarrage: {e}")
-        import traceback
-        traceback.print_exc()
         sys.exit(1)
 
 

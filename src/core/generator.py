@@ -4,8 +4,8 @@
 GÉNÉRATEURS DE DONNÉES - CORE MODULE
 ====================================
 
-Modules core pour la génération des données électriques et météorologiques.
-Séparation claire: ElectricityGenerator et WeatherGenerator.
+Modules core pour la génération des données électriques, météorologiques et eau.
+Séparation claire: ElectricityGenerator, WeatherGenerator, WaterGenerator.
 """
 
 import time
@@ -439,7 +439,7 @@ class WeatherGenerator:
     
     def _calculate_heat_index(self, temp_c: float, humidity: float) -> float:
         """
-        Calcule l'indice de chaleur (température apparente)
+        Calcule l'indice de chaleur (température apparente) - VERSION CORRIGÉE
         
         Args:
             temp_c: Température en Celsius
@@ -448,7 +448,7 @@ class WeatherGenerator:
         Returns:
             float: Température apparente en Celsius
         """
-        # Conversion en Fahrenheit
+        # Conversion en Fahrenheit pour calcul
         temp_f = temp_c * 9/5 + 32
         rh = humidity * 100
         
@@ -463,7 +463,13 @@ class WeatherGenerator:
                   0.00122874 * temp_f * temp_f * rh + 0.00085282 * temp_f * rh * rh -
                   0.00000199 * temp_f * temp_f * rh * rh)
         
-        # ==============================================================================
+        # Conversion retour en Celsius - PARTIE MANQUANTE CORRIGÉE
+        hi_celsius = (hi - 32) * 5/9
+        
+        return hi_celsius
+
+
+# ==============================================================================
 # GÉNÉRATEUR CONSOMMATION D'EAU
 # ==============================================================================
 
@@ -597,17 +603,9 @@ class WaterGenerator:
         
         Basé sur les standards Malaysia de consommation d'eau
         """
-        # Consommation d'eau de base par type (litres/m²/jour)
-        water_consumption_rates = {
-            'residential': 150,    # 150 L/m²/jour pour résidentiel
-            'commercial': 80,      # 80 L/m²/jour pour commercial
-            'office': 60,          # 60 L/m²/jour pour bureaux
-            'industrial': 200,     # 200 L/m²/jour pour industriel (process)
-            'school': 100,         # 100 L/m²/jour pour écoles
-            'hospital': 300        # 300 L/m²/jour pour hôpitaux
-        }
-        
-        daily_consumption_m2 = water_consumption_rates.get(building_type, 150)
+        # Utilisation des données de config.py
+        config = MalaysiaConfig.get_building_type_config(building_type)
+        daily_consumption_m2 = config.get('base_water_consumption_l_m2_day', 150)
         
         # Conversion en horaire
         hourly_consumption = (daily_consumption_m2 * surface_area) / 24

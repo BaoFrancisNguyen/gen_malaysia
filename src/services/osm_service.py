@@ -5,7 +5,7 @@ SERVICE OSM - COUCHE SERVICE
 ============================
 
 Service métier pour les opérations OSM.
-Orchestre les appels au OSMHandler et gère la logique métier.
+VERSION CORRIGÉE: Utilise les relations administratives OSM.
 """
 
 import logging
@@ -20,17 +20,18 @@ logger = logging.getLogger(__name__)
 
 
 class OSMService:
-    """Service métier pour les opérations OpenStreetMap"""
+    """Service métier pour les opérations OpenStreetMap avec relations administratives"""
     
     def __init__(self):
         """Initialise le service OSM"""
         self.osm_handler = OSMHandler()
         self.load_count = 0
-        logger.info("✅ OSMService initialisé")
+        logger.info("✅ OSMService initialisé (méthode relations administratives)")
     
     def load_buildings_for_zone(self, zone_name: str) -> Dict:
         """
-        Charge les bâtiments pour une zone Malaysia
+        Charge les bâtiments pour une zone Malaysia via relation administrative
+        MÉTHODE ORIGINALE CORRECTE
         
         Args:
             zone_name: Nom de la zone (ex: 'kuala_lumpur')
@@ -51,10 +52,12 @@ class OSMService:
             
             # Récupération de la configuration de zone
             zone_config = MalaysiaConfig.get_zone_config(zone_name)
-            logger.info(f"🏢 Chargement OSM zone: {zone_config['name']}")
+            osm_relation_id = zone_config['osm_relation_id']
             
-            # Appel au handler OSM
-            result = self.osm_handler.fetch_buildings_from_bbox(zone_config['bbox'])
+            logger.info(f"🏢 Chargement OSM zone: {zone_config['name']} (relation {osm_relation_id})")
+            
+            # Appel au handler OSM avec relation administrative
+            result = self.osm_handler.fetch_buildings_from_relation(osm_relation_id, zone_name)
             
             if result['success']:
                 # Enrichissement des métadonnées
@@ -69,17 +72,18 @@ class OSMService:
                 return {
                     'success': True,
                     'buildings': enriched_buildings,
-                    'buildings_data': enriched_buildings,  # Ajout pour la cartographie
+                    'buildings_data': enriched_buildings,  # Pour la cartographie
                     'metadata': {
                         'zone_name': zone_name,
                         'zone_display_name': zone_config['name'],
+                        'osm_relation_id': osm_relation_id,
                         'building_count': len(enriched_buildings),
                         'load_time_seconds': result['metadata']['query_time_seconds'],
-                        'bbox': zone_config['bbox'],
                         'load_number': self.load_count,
                         'statistics': stats,
                         'loaded_at': datetime.now().isoformat(),
-                        'map_recommended': len(enriched_buildings) <= 5000 and zone_name != 'malaysia'
+                        'map_recommended': len(enriched_buildings) <= 5000 and zone_name != 'malaysia',
+                        'method': 'administrative_relation'
                     }
                 }
             else:
@@ -116,7 +120,8 @@ class OSMService:
             enriched_building['building_type_info'] = {
                 'type': building_type,
                 'description': type_config['description'],
-                'base_consumption_kwh_m2_day': type_config['base_consumption_kwh_m2_day']
+                'base_consumption_kwh_m2_day': type_config['base_consumption_kwh_m2_day'],
+                'base_water_consumption_l_m2_day': type_config['base_water_consumption_l_m2_day']
             }
             
             # Validation et nettoyage des coordonnées
@@ -132,6 +137,7 @@ class OSMService:
             enriched_building['processing_metadata'] = {
                 'enriched_at': datetime.now().isoformat(),
                 'source_system': 'malaysia_electricity_generator_v3',
+                'extraction_method': 'osm_administrative_relation',
                 'data_quality': self._assess_building_quality(building)
             }
             
@@ -168,6 +174,10 @@ class OSMService:
         osm_tags = building.get('osm_tags', {})
         if not osm_tags or len(osm_tags) < 2:
             score -= 15  # Peu de métadonnées OSM
+        
+        # Bonus pour extraction via relation administrative
+        if building.get('source') == 'openstreetmap':
+            score += 5  # Méthode plus fiable
         
         # Classification qualité
         if score >= 90:
@@ -223,7 +233,8 @@ class OSMService:
                 'high_quality': round((quality_counts['excellent'] + quality_counts['good']) / building_count * 100, 1),
                 'acceptable_quality': round(quality_counts['acceptable'] / building_count * 100, 1),
                 'poor_quality': round(quality_counts['poor'] / building_count * 100, 1)
-            }
+            },
+            'extraction_method': 'administrative_relation'
         }
     
     def get_service_statistics(self) -> Dict:
@@ -239,5 +250,6 @@ class OSMService:
             'service_loads': self.load_count,
             'osm_handler_stats': osm_handler_stats,
             'available_zones': list(MalaysiaConfig.ZONES.keys()),
-            'supported_building_types': list(MalaysiaConfig.BUILDING_TYPES.keys())
+            'supported_building_types': list(MalaysiaConfig.BUILDING_TYPES.keys()),
+            'method': 'administrative_relations'
         }

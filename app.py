@@ -1,41 +1,4 @@
-@app.route('/api/generate', methods=['POST'])
-def api_generate_data():
-    """API: Génère les données selon la sélection utilisateur"""
-    global current_consumption, current_weather, current_water
-    
-    try:
-        data = request.get_json()
-        
-        # Validation des paramètres
-        required = ['start_date', 'end_date']
-        for param in required:
-            if param not in data:
-                return jsonify({
-                    'success': False,
-                    'error': f'Paramètre manquant: {param}'
-                }), 400
-        
-        # Validation des dates
-        if not validate_date_range(data['start_date'], data['end_date']):
-            return jsonify({
-                'success': False,
-                'error': 'Plage de dates invalide'
-            }), 400
-        
-        # Vérifier cache bâtiments
-        if not app_cache['buildings']:
-            return jsonify({
-                'success': False,
-                'error': 'Aucun bâtiment chargé'
-            }), 400
-        
-        # Récupération des choix utilisateur (par défaut tous actifs)
-        generate_electricity = data.get('generate_electricity', True)
-        generate_water = data.get('generate_water', True)
-        generate_weather = data.get('generate_weather', True)
-        
-        # Validation qu'au moins un type est sélectionné
-        #!/usr/bin/env python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 MALAYSIA ELECTRICITY GENERATOR - APPLICATION FLASK PRINCIPALE
@@ -43,7 +6,7 @@ MALAYSIA ELECTRICITY GENERATOR - APPLICATION FLASK PRINCIPALE
 
 Application Flask principale utilisant l'architecture modulaire factorée.
 
-Version: 3.0.0 - Factorisée
+Version: 3.0.0 - Factorisée avec support de 4 types de données
 """
 
 import os
@@ -57,7 +20,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 # Imports des modules factorés
 from src.core.osm_handler import OSMHandler
-from src.core.generator import ElectricityGenerator, WeatherGenerator  
+from src.core.generator import ElectricityGenerator, WeatherGenerator, WaterGenerator
 from src.core.data_exporter import DataExporter
 from src.services.osm_service import OSMService
 from src.services.generation_service import GenerationService
@@ -78,11 +41,12 @@ osm_service = OSMService()
 generation_service = GenerationService() 
 export_service = ExportService()
 
-# Cache global simple
+# Cache global simple avec support eau
 app_cache = {
     'buildings': [],
     'consumption_data': None,
-    'weather_data': None
+    'weather_data': None,
+    'water_data': None
 }
 
 
@@ -138,7 +102,7 @@ def api_load_buildings(zone_name):
 
 @app.route('/api/generate', methods=['POST'])
 def api_generate_data():
-    """API: Génère les données électriques et météo"""
+    """API: Génère les données selon la sélection utilisateur"""
     try:
         data = request.get_json()
         
@@ -165,18 +129,40 @@ def api_generate_data():
                 'error': 'Aucun bâtiment chargé'
             }), 400
         
+        # Récupération des choix utilisateur (par défaut tous actifs)
+        generate_electricity = data.get('generate_electricity', True)
+        generate_water = data.get('generate_water', True)
+        generate_weather = data.get('generate_weather', True)
+        
+        # Validation qu'au moins un type est sélectionné
+        if not any([generate_electricity, generate_water, generate_weather]):
+            return jsonify({
+                'success': False,
+                'error': 'Aucun type de données sélectionné'
+            }), 400
+        
         # Génération via le service
         result = generation_service.generate_all_data(
             buildings=app_cache['buildings'],
             start_date=data['start_date'],
             end_date=data['end_date'],
             frequency=data.get('frequency', '1H'),
-            weather_stations=data.get('weather_stations', 5)
+            weather_stations=data.get('weather_stations', 5),
+            generate_electricity=generate_electricity,
+            generate_water=generate_water,
+            generate_weather=generate_weather
         )
         
         if result['success']:
+            # Mise à jour du cache avec les nouveaux types de données
             app_cache['consumption_data'] = result['consumption_data']
+            app_cache['water_data'] = result['water_data']
             app_cache['weather_data'] = result['weather_data']
+            
+            logger.info(f"Cache mis à jour: "
+                       f"{result['summary']['consumption_points']} points électricité, "
+                       f"{result['summary']['water_points']} points eau, "
+                       f"{result['summary']['weather_points']} points météo")
         
         return jsonify(result)
         
@@ -187,7 +173,7 @@ def api_generate_data():
 
 @app.route('/api/export', methods=['POST'])
 def api_export_data():
-    """API: Exporte les 3 datasets"""
+    """API: Exporte les 4 datasets possibles"""
     try:
         data = request.get_json() or {}
         
@@ -206,11 +192,12 @@ def api_export_data():
                 'error': 'Aucune donnée à exporter'
             }), 400
         
-        # Export via le service
+        # Export via le service avec support des 4 types
         result = export_service.export_all_datasets(
             buildings=app_cache['buildings'],
             consumption_data=app_cache['consumption_data'],
             weather_data=app_cache['weather_data'],
+            water_data=app_cache['water_data'],  # Nouveau paramètre
             export_format=export_format,
             base_filename=data.get('filename')
         )
@@ -240,10 +227,12 @@ def api_download_file(filename):
 
 @app.route('/api/status')
 def api_status():
-    """API: Statut de l'application"""
+    """API: Statut de l'application avec support des 4 types"""
     try:
+        # Calcul des points pour chaque type
         consumption_points = len(app_cache['consumption_data']) if app_cache['consumption_data'] is not None else 0
         weather_points = len(app_cache['weather_data']) if app_cache['weather_data'] is not None else 0
+        water_points = len(app_cache['water_data']) if app_cache['water_data'] is not None else 0
         
         return jsonify({
             'success': True,
@@ -252,17 +241,182 @@ def api_status():
             'cache': {
                 'buildings_loaded': len(app_cache['buildings']),
                 'consumption_points': consumption_points,
-                'weather_points': weather_points
+                'weather_points': weather_points,
+                'water_points': water_points,
+                'total_points': consumption_points + weather_points + water_points
             },
             'config': {
                 'available_zones': list(MalaysiaConfig.ZONES.keys()),
                 'supported_formats': ['csv', 'parquet', 'xlsx'],
-                'export_directory': str(AppConfig.EXPORTS_DIR)
+                'export_directory': str(AppConfig.EXPORTS_DIR),
+                'data_types_supported': ['electricity', 'water', 'weather', 'buildings_metadata']
+            },
+            'features': {
+                'four_datasets_export': True,
+                'selective_generation': True,
+                'interactive_mapping': True
             }
         })
         
     except Exception as e:
         logger.error(f"Erreur statut: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/clear-cache', methods=['POST'])
+def api_clear_cache():
+    """API: Vide le cache de l'application"""
+    try:
+        # Réinitialisation complète du cache
+        app_cache['buildings'] = []
+        app_cache['consumption_data'] = None
+        app_cache['weather_data'] = None
+        app_cache['water_data'] = None
+        
+        logger.info("🗑️ Cache application vidé")
+        
+        return jsonify({
+            'success': True,
+            'message': 'Cache vidé avec succès',
+            'cache_status': {
+                'buildings': 0,
+                'consumption_points': 0,
+                'weather_points': 0,
+                'water_points': 0
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur vidage cache: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/statistics')
+def api_statistics():
+    """API: Statistiques détaillées de l'application"""
+    try:
+        # Statistiques des services
+        osm_stats = osm_service.get_service_statistics()
+        generation_stats = generation_service.get_service_statistics()
+        export_stats = export_service.get_export_summary()
+        
+        return jsonify({
+            'success': True,
+            'application_stats': {
+                'version': '3.0.0',
+                'cache_status': {
+                    'buildings_loaded': len(app_cache['buildings']),
+                    'consumption_points': len(app_cache['consumption_data']) if app_cache['consumption_data'] is not None else 0,
+                    'weather_points': len(app_cache['weather_data']) if app_cache['weather_data'] is not None else 0,
+                    'water_points': len(app_cache['water_data']) if app_cache['water_data'] is not None else 0
+                }
+            },
+            'osm_service_stats': osm_stats,
+            'generation_service_stats': generation_stats,
+            'export_service_stats': export_stats
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur statistiques: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==============================================================================
+# ROUTES UTILITAIRES
+# ==============================================================================
+
+@app.route('/api/validate-dates', methods=['POST'])
+def api_validate_dates():
+    """API: Valide une plage de dates"""
+    try:
+        data = request.get_json()
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        
+        if not start_date or not end_date:
+            return jsonify({
+                'valid': False,
+                'error': 'Dates manquantes'
+            }), 400
+        
+        is_valid = validate_date_range(start_date, end_date)
+        
+        if is_valid:
+            # Calcul statistiques
+            from datetime import datetime
+            start = datetime.strptime(start_date, '%Y-%m-%d')
+            end = datetime.strptime(end_date, '%Y-%m-%d')
+            duration_days = (end - start).days
+            
+            return jsonify({
+                'valid': True,
+                'duration_days': duration_days,
+                'recommended_frequency': '1H' if duration_days <= 7 else '3H' if duration_days <= 30 else 'D'
+            })
+        else:
+            return jsonify({
+                'valid': False,
+                'error': 'Plage de dates invalide'
+            })
+            
+    except Exception as e:
+        logger.error(f"Erreur validation dates: {e}")
+        return jsonify({'valid': False, 'error': str(e)}), 500
+
+
+@app.route('/api/estimate-size', methods=['POST'])
+def api_estimate_size():
+    """API: Estime la taille de génération/export"""
+    try:
+        data = request.get_json()
+        
+        buildings_count = len(app_cache['buildings'])
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        frequency = data.get('frequency', '1H')
+        weather_stations = data.get('weather_stations', 5)
+        
+        if not start_date or not end_date:
+            return jsonify({'error': 'Dates manquantes'}), 400
+        
+        # Calcul estimation
+        from datetime import datetime
+        start = datetime.strptime(start_date, '%Y-%m-%d')
+        end = datetime.strptime(end_date, '%Y-%m-%d')
+        duration_days = (end - start).days
+        
+        # Points par jour selon fréquence
+        points_per_day = {
+            '15T': 96, '30T': 48, '1H': 24, '2H': 12,
+            '3H': 8, '6H': 4, '12H': 2, 'D': 1
+        }.get(frequency, 24)
+        
+        estimated_consumption_points = buildings_count * duration_days * points_per_day
+        estimated_water_points = buildings_count * duration_days * points_per_day
+        estimated_weather_points = weather_stations * duration_days * points_per_day
+        
+        # Estimation taille (approximative)
+        estimated_size_mb = (
+            estimated_consumption_points * 0.2 +  # 200 bytes par point électricité
+            estimated_water_points * 0.18 +       # 180 bytes par point eau
+            estimated_weather_points * 0.5        # 500 bytes par point météo
+        ) / 1024 / 1024
+        
+        return jsonify({
+            'success': True,
+            'estimates': {
+                'duration_days': duration_days,
+                'consumption_points': estimated_consumption_points,
+                'water_points': estimated_water_points,
+                'weather_points': estimated_weather_points,
+                'total_points': estimated_consumption_points + estimated_water_points + estimated_weather_points,
+                'estimated_size_mb': round(estimated_size_mb, 1),
+                'estimated_generation_time_minutes': round((estimated_consumption_points + estimated_water_points + estimated_weather_points) / 50000, 1)
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"Erreur estimation: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -279,19 +433,25 @@ def internal_error(error):
     logger.error(f"Erreur interne: {error}")
     return jsonify({'success': False, 'error': 'Erreur interne du serveur'}), 500
 
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    return jsonify({'success': False, 'error': 'Requête trop volumineuse'}), 413
+
 
 # ==============================================================================
 # POINT D'ENTRÉE
 # ==============================================================================
 
 if __name__ == '__main__':
-    logger.info("="*60)
-    logger.info("🇲🇾 MALAYSIA ELECTRICITY GENERATOR v3.0 - FACTORISÉ")
-    logger.info("="*60)
+    logger.info("="*70)
+    logger.info("🇲🇾 MALAYSIA ELECTRICITY GENERATOR v3.0 - ARCHITECTURE FACTORISÉE")
+    logger.info("="*70)
     logger.info("✨ Architecture modulaire avec séparation des responsabilités")
-    logger.info("📁 3 fichiers d'export distincts")
+    logger.info("📁 4 fichiers d'export distincts : bâtiments, électricité, eau, météo")
+    logger.info("🎛️ Génération sélective par type de données")
+    logger.info("🗺️ Cartographie interactive intégrée")
     logger.info(f"🌐 URL: http://127.0.0.1:5000")
-    logger.info("="*60)
+    logger.info("="*70)
     
     app.run(
         host='127.0.0.1',

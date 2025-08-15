@@ -4,8 +4,7 @@
 FONCTIONS D'AIDE - UTILS MODULE
 ===============================
 
-Fonctions utilitaires partagées dans toute l'application.
-Évite la duplication de code et centralise les calculs communs.
+Fonctions utilitaires centralisées. Version optimisée sans redondances.
 """
 
 import os
@@ -18,8 +17,12 @@ from pathlib import Path
 from typing import List, Tuple, Dict, Any
 import numpy as np
 
-from config import AppConfig
+from config import AppConfig, MalaysiaConfig, LogConfig, MathConstants
 
+
+# ==============================================================================
+# CONFIGURATION LOGGING (centralisée)
+# ==============================================================================
 
 def setup_logging() -> logging.Logger:
     """
@@ -36,7 +39,8 @@ def setup_logging() -> logging.Logger:
     
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format=LogConfig.LOG_FORMAT,
+        datefmt=LogConfig.LOG_DATE_FORMAT,
         handlers=[
             logging.FileHandler(log_file, encoding='utf-8'),
             logging.StreamHandler(sys.stdout)
@@ -50,7 +54,7 @@ def setup_logging() -> logging.Logger:
 
 
 # ==============================================================================
-# GÉNÉRATION D'IDENTIFIANTS
+# GÉNÉRATION D'IDENTIFIANTS (centralisée)
 # ==============================================================================
 
 def generate_unique_id(prefix: str = '', length: int = 8) -> str:
@@ -93,10 +97,10 @@ def generate_building_id(building_type: str, source: str) -> str:
 
 def generate_session_id() -> str:
     """
-    Génère un ID de session unique
+    Génère un ID de session unique avec timestamp
     
     Returns:
-        str: ID de session avec timestamp
+        str: ID de session
     """
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     unique_part = generate_unique_id(length=6)
@@ -104,7 +108,7 @@ def generate_session_id() -> str:
 
 
 # ==============================================================================
-# CALCULS GÉOGRAPHIQUES ET GÉOMÉTRIQUES
+# CALCULS GÉOGRAPHIQUES (centralisés et optimisés)
 # ==============================================================================
 
 def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -118,9 +122,6 @@ def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
     Returns:
         float: Distance en kilomètres
     """
-    # Rayon de la Terre en km
-    R = 6371.0
-    
     # Conversion en radians
     lat1_rad = math.radians(lat1)
     lon1_rad = math.radians(lon1)
@@ -136,12 +137,13 @@ def calculate_distance_km(lat1: float, lon1: float, lat2: float, lon2: float) ->
          math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2)
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     
-    return R * c
+    return MathConstants.EARTH_RADIUS_KM * c
 
 
 def calculate_approximate_area(coordinates: List[Tuple[float, float]]) -> float:
     """
     Calcule une surface approximative en m² depuis une liste de coordonnées
+    VERSION UNIQUE - Supprime les doublons dans building.py
     
     Args:
         coordinates: Liste de tuples (latitude, longitude)
@@ -165,8 +167,7 @@ def calculate_approximate_area(coordinates: List[Tuple[float, float]]) -> float:
         area = abs(area) / 2.0
         
         # Conversion approximative degrés -> m²
-        # 1 degré ≈ 111 km à l'équateur
-        area_m2 = area * 111000 * 111000
+        area_m2 = area * MathConstants.METERS_PER_DEGREE_LAT * MathConstants.METERS_PER_DEGREE_LAT
         
         # Surface minimale et maximale réalistes
         return max(min(area_m2, 100000), 10.0)  # Entre 10m² et 100,000m²
@@ -198,21 +199,29 @@ def calculate_bbox_area(bbox: List[float]) -> float:
     return width_km * height_km
 
 
+def validate_malaysia_coordinates(latitude: float, longitude: float) -> bool:
+    """
+    Vérifie si des coordonnées sont dans les limites Malaysia
+    VERSION UNIQUE - Centralisée ici, supprime les doublons
+    
+    Args:
+        latitude: Latitude
+        longitude: Longitude
+        
+    Returns:
+        bool: True si dans les limites Malaysia
+    """
+    bounds = MalaysiaConfig.BOUNDS
+    return (bounds['south'] <= latitude <= bounds['north'] and 
+            bounds['west'] <= longitude <= bounds['east'])
+
+
 # ==============================================================================
-# MANIPULATION DE DONNÉES
+# MANIPULATION DE DONNÉES (optimisée)
 # ==============================================================================
 
 def safe_float_parse(value: Any, default: float = 0.0) -> float:
-    """
-    Parse une valeur en float de manière sécurisée
-    
-    Args:
-        value: Valeur à parser
-        default: Valeur par défaut si échec
-        
-    Returns:
-        float: Valeur parsée ou défaut
-    """
+    """Parse une valeur en float de manière sécurisée"""
     try:
         return float(value)
     except (ValueError, TypeError):
@@ -220,16 +229,7 @@ def safe_float_parse(value: Any, default: float = 0.0) -> float:
 
 
 def safe_int_parse(value: Any, default: int = 0) -> int:
-    """
-    Parse une valeur en int de manière sécurisée
-    
-    Args:
-        value: Valeur à parser
-        default: Valeur par défaut si échec
-        
-    Returns:
-        int: Valeur parsée ou défaut
-    """
+    """Parse une valeur en int de manière sécurisée"""
     try:
         return int(value)
     except (ValueError, TypeError):
@@ -237,16 +237,7 @@ def safe_int_parse(value: Any, default: int = 0) -> int:
 
 
 def chunk_list(data_list: List[Any], chunk_size: int) -> List[List[Any]]:
-    """
-    Divise une liste en chunks de taille donnée
-    
-    Args:
-        data_list: Liste à diviser
-        chunk_size: Taille des chunks
-        
-    Returns:
-        List[List]: Liste de chunks
-    """
+    """Divise une liste en chunks de taille donnée"""
     chunks = []
     for i in range(0, len(data_list), chunk_size):
         chunks.append(data_list[i:i + chunk_size])
@@ -254,16 +245,7 @@ def chunk_list(data_list: List[Any], chunk_size: int) -> List[List[Any]]:
 
 
 def deep_merge_dict(dict1: Dict, dict2: Dict) -> Dict:
-    """
-    Fusion profonde de deux dictionnaires
-    
-    Args:
-        dict1: Premier dictionnaire
-        dict2: Second dictionnaire (prioritaire)
-        
-    Returns:
-        Dict: Dictionnaire fusionné
-    """
+    """Fusion profonde de deux dictionnaires"""
     result = dict1.copy()
     
     for key, value in dict2.items():
@@ -276,19 +258,11 @@ def deep_merge_dict(dict1: Dict, dict2: Dict) -> Dict:
 
 
 # ==============================================================================
-# FORMATAGE ET AFFICHAGE
+# FORMATAGE ET AFFICHAGE (centralisé)
 # ==============================================================================
 
 def format_duration(seconds: float) -> str:
-    """
-    Formate une durée en secondes vers un format lisible
-    
-    Args:
-        seconds: Durée en secondes
-        
-    Returns:
-        str: Durée formatée
-    """
+    """Formate une durée en secondes vers un format lisible"""
     if seconds < 1:
         return f"{seconds*1000:.0f}ms"
     elif seconds < 60:
@@ -302,19 +276,11 @@ def format_duration(seconds: float) -> str:
 
 
 def format_file_size(size_bytes: int) -> str:
-    """
-    Formate une taille de fichier en bytes vers un format lisible
-    
-    Args:
-        size_bytes: Taille en bytes
-        
-    Returns:
-        str: Taille formatée
-    """
+    """Formate une taille de fichier en bytes vers un format lisible"""
     if size_bytes == 0:
         return "0 B"
     
-    size_names = ["B", "KB", "MB", "GB", "TB"]
+    size_names = MathConstants.SIZE_PREFIXES
     i = int(math.floor(math.log(size_bytes, 1024)))
     
     if i >= len(size_names):
@@ -327,16 +293,7 @@ def format_file_size(size_bytes: int) -> str:
 
 
 def format_number(number: float, precision: int = 2) -> str:
-    """
-    Formate un nombre avec séparateurs de milliers
-    
-    Args:
-        number: Nombre à formater
-        precision: Nombre de décimales
-        
-    Returns:
-        str: Nombre formaté
-    """
+    """Formate un nombre avec séparateurs de milliers"""
     if precision == 0:
         return f"{int(number):,}".replace(',', ' ')
     else:
@@ -348,15 +305,7 @@ def format_number(number: float, precision: int = 2) -> str:
 # ==============================================================================
 
 def ensure_directory(directory_path: Path) -> bool:
-    """
-    S'assure qu'un dossier existe
-    
-    Args:
-        directory_path: Chemin du dossier
-        
-    Returns:
-        bool: True si succès, False sinon
-    """
+    """S'assure qu'un dossier existe"""
     try:
         directory_path.mkdir(parents=True, exist_ok=True)
         return True
@@ -366,33 +315,17 @@ def ensure_directory(directory_path: Path) -> bool:
 
 
 def get_file_size_mb(file_path: Path) -> float:
-    """
-    Retourne la taille d'un fichier en MB
-    
-    Args:
-        file_path: Chemin du fichier
-        
-    Returns:
-        float: Taille en MB
-    """
+    """Retourne la taille d'un fichier en MB"""
     try:
         size_bytes = file_path.stat().st_size
-        return size_bytes / (1024 * 1024)
+        return size_bytes / (1024 * 1024)  # Conversion directe en MB
     except Exception:
         return 0.0
 
 
 def clean_filename(filename: str) -> str:
-    """
-    Nettoie un nom de fichier en supprimant les caractères interdits
-    
-    Args:
-        filename: Nom de fichier à nettoyer
-        
-    Returns:
-        str: Nom de fichier nettoyé
-    """
-    # Caractères interdits
+    """Nettoie un nom de fichier en supprimant les caractères interdits"""
+    # Caractères interdits centralisés
     forbidden_chars = '<>:"/\\|?*'
     
     cleaned = filename
@@ -406,12 +339,13 @@ def clean_filename(filename: str) -> str:
 
 
 # ==============================================================================
-# UTILITAIRES SPÉCIFIQUES MALAYSIA
+# UTILITAIRES SPÉCIFIQUES MALAYSIA (centralisés)
 # ==============================================================================
 
 def normalize_building_type(raw_type: str) -> str:
     """
     Normalise un type de bâtiment vers nos catégories standards
+    VERSION UNIQUE - Supprime le doublon dans building.py
     
     Args:
         raw_type: Type brut (ex: depuis OSM)
@@ -424,69 +358,109 @@ def normalize_building_type(raw_type: str) -> str:
     
     raw_lower = raw_type.lower()
     
-    # Mapping vers nos types
-    type_mapping = {
-        'house': 'residential',
-        'apartment': 'residential',
-        'flat': 'residential',
-        'terrace': 'residential',
-        'shop': 'commercial',
-        'retail': 'commercial',
-        'mall': 'commercial',
-        'store': 'commercial',
-        'office': 'office',
-        'government': 'office',
-        'civic': 'office',
-        'factory': 'industrial',
-        'warehouse': 'industrial',
-        'industrial': 'industrial',
-        'school': 'school',
-        'university': 'school',
-        'college': 'school',
-        'hospital': 'hospital',
-        'clinic': 'hospital',
-        'healthcare': 'hospital'
-    }
-    
-    for key, normalized_type in type_mapping.items():
-        if key in raw_lower:
-            return normalized_type
+    # Utilisation de la configuration centralisée
+    for building_type, config in MalaysiaConfig.BUILDING_TYPES.items():
+        osm_tags = config.get('osm_tags', [])
+        if any(tag in raw_lower for tag in osm_tags):
+            return building_type
     
     return 'residential'  # Par défaut
 
 
-def validate_malaysia_coordinates(lat: float, lon: float) -> bool:
+# ==============================================================================
+# FACTORY PATTERNS POUR MÉTADONNÉES (nouveaux)
+# ==============================================================================
+
+def create_metadata_base() -> Dict:
+    """Crée les métadonnées de base standardisées"""
+    return {
+        'created_at': datetime.now().isoformat(),
+        'system_version': AppConfig.VERSION,
+        'system_name': AppConfig.NAME
+    }
+
+
+def create_session_metadata(session_type: str, **kwargs) -> Dict:
     """
-    Vérifie si des coordonnées sont dans les limites de la Malaysia
+    Crée des métadonnées de session standardisées
     
     Args:
-        lat: Latitude
-        lon: Longitude
+        session_type: Type de session ('generation', 'export', 'osm')
+        **kwargs: Paramètres additionnels
         
     Returns:
-        bool: True si dans les limites Malaysia
+        Dict: Métadonnées de session
     """
-    from config import MalaysiaConfig
+    metadata = create_metadata_base()
+    metadata.update({
+        'session_id': generate_session_id(),
+        'session_type': session_type,
+        'parameters': kwargs
+    })
+    return metadata
+
+
+def create_error_response(error_code: str, details: str = None, **kwargs) -> Dict:
+    """
+    Crée une réponse d'erreur standardisée
     
-    bounds = MalaysiaConfig.BOUNDS
-    return (bounds['south'] <= lat <= bounds['north'] and 
-            bounds['west'] <= lon <= bounds['east'])
+    Args:
+        error_code: Code d'erreur depuis AppConfig.MESSAGES['errors']
+        details: Détails additionnels
+        **kwargs: Données additionnelles
+        
+    Returns:
+        Dict: Réponse d'erreur standardisée
+    """
+    error_message = AppConfig.MESSAGES['errors'].get(error_code, error_code)
+    
+    response = {
+        'success': False,
+        'error': error_message,
+        'error_code': error_code,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    if details:
+        response['details'] = details
+    
+    response.update(kwargs)
+    return response
+
+
+def create_success_response(message_code: str, data: Any = None, **kwargs) -> Dict:
+    """
+    Crée une réponse de succès standardisée
+    
+    Args:
+        message_code: Code de message depuis AppConfig.MESSAGES['success']
+        data: Données de réponse
+        **kwargs: Données additionnelles
+        
+    Returns:
+        Dict: Réponse de succès standardisée
+    """
+    success_message = AppConfig.MESSAGES['success'].get(message_code, message_code)
+    
+    response = {
+        'success': True,
+        'message': success_message,
+        'timestamp': datetime.now().isoformat()
+    }
+    
+    if data is not None:
+        response['data'] = data
+    
+    response.update(kwargs)
+    return response
 
 
 # ==============================================================================
-# UTILITAIRES DE PERFORMANCE
+# UTILITAIRES DE PERFORMANCE (optimisés)
 # ==============================================================================
 
 def log_performance(func):
-    """
-    Décorateur pour logger les performances d'une fonction
-    
-    Args:
-        func: Fonction à décorer
-        
-    Returns:
-        Function: Fonction décorée
-    """
+    """Décorateur pour logger les performances d'une fonction"""
     def wrapper(*args, **kwargs):
         start_time = datetime.now()
         logger = logging.getLogger(__name__)
@@ -506,34 +480,21 @@ def log_performance(func):
 
 
 def memory_usage_mb() -> float:
-    """
-    Retourne l'utilisation mémoire actuelle en MB
-    
-    Returns:
-        float: Mémoire utilisée en MB
-    """
+    """Retourne l'utilisation mémoire actuelle en MB"""
     try:
         import psutil
         process = psutil.Process()
-        return process.memory_info().rss / 1024 / 1024
+        return process.memory_info().rss / MathConstants.CONVERSION['bytes_to_mb']
     except ImportError:
-        return 0.0  # psutil non disponible
+        return 0.0
 
 
 # ==============================================================================
-# UTILITAIRES DE VALIDATION
+# UTILITAIRES DE VALIDATION SIMPLIFIÉS
 # ==============================================================================
 
 def is_valid_date_string(date_string: str) -> bool:
-    """
-    Vérifie si une chaîne est une date valide au format YYYY-MM-DD
-    
-    Args:
-        date_string: Chaîne de date
-        
-    Returns:
-        bool: True si valide
-    """
+    """Vérifie si une chaîne est une date valide au format YYYY-MM-DD"""
     try:
         datetime.strptime(date_string, '%Y-%m-%d')
         return True
@@ -542,14 +503,138 @@ def is_valid_date_string(date_string: str) -> bool:
 
 
 def is_valid_frequency(frequency: str) -> bool:
+    """Vérifie si une fréquence est valide"""
+    from config import TimeConfig
+    return frequency in TimeConfig.SUPPORTED_FREQUENCIES
+
+
+# ==============================================================================
+# UTILITAIRES DE CALCUL ÉNERGÉTIQUE (centralisés)
+# ==============================================================================
+
+def calculate_energy_intensity(consumption_kwh: float, surface_m2: float) -> float:
     """
-    Vérifie si une fréquence pandas est valide
+    Calcule l'intensité énergétique en kWh/m²
     
     Args:
-        frequency: Fréquence (ex: '1H', '15T')
+        consumption_kwh: Consommation en kWh
+        surface_m2: Surface en m²
         
     Returns:
-        bool: True si valide
+        float: Intensité énergétique
     """
-    valid_frequencies = ['15T', '30T', '1H', '2H', '3H', '6H', '12H', 'D', 'W']
-    return frequency in valid_frequencies
+    if surface_m2 <= 0:
+        return 0.0
+    return consumption_kwh / surface_m2
+
+
+def calculate_water_intensity(consumption_liters: float, surface_m2: float) -> float:
+    """
+    Calcule l'intensité de consommation d'eau en L/m²
+    
+    Args:
+        consumption_liters: Consommation en litres
+        surface_m2: Surface en m²
+        
+    Returns:
+        float: Intensité eau
+    """
+    if surface_m2 <= 0:
+        return 0.0
+    return consumption_liters / surface_m2
+
+
+def estimate_processing_time(total_points: int, processing_rate: int = 50000) -> float:
+    """
+    Estime le temps de traitement en minutes
+    
+    Args:
+        total_points: Nombre total de points de données
+        processing_rate: Points traités par minute
+        
+    Returns:
+        float: Temps estimé en minutes
+    """
+    return total_points / processing_rate
+
+
+def estimate_memory_usage(total_points: int, bytes_per_point: int = 200) -> float:
+    """
+    Estime l'utilisation mémoire en MB
+    
+    Args:
+        total_points: Nombre total de points
+        bytes_per_point: Bytes par point de données
+        
+    Returns:
+        float: Mémoire estimée en MB
+    """
+    total_bytes = total_points * bytes_per_point
+    return total_bytes / MathConstants.CONVERSION['bytes_to_mb']
+
+
+# ==============================================================================
+# UTILITAIRES DE CONVERSION (centralisés)
+# ==============================================================================
+
+def convert_temperature(temp_celsius: float, to_unit: str = 'kelvin') -> float:
+    """Convertit une température depuis Celsius"""
+    if to_unit == 'kelvin':
+        return temp_celsius + MathConstants.CONVERSION['celsius_to_kelvin']
+    elif to_unit == 'fahrenheit':
+        return temp_celsius * 9/5 + 32
+    else:
+        return temp_celsius
+
+
+def convert_energy(energy_kwh: float, to_unit: str = 'wh') -> float:
+    """Convertit une énergie depuis kWh"""
+    if to_unit == 'wh':
+        return energy_kwh * MathConstants.CONVERSION['kwh_to_wh']
+    elif to_unit == 'mwh':
+        return energy_kwh / 1000
+    else:
+        return energy_kwh
+
+
+# ==============================================================================
+# UTILITAIRES DE DEBUG ET DÉVELOPPEMENT
+# ==============================================================================
+
+def log_system_info():
+    """Log les informations système pour debug"""
+    logger = logging.getLogger(__name__)
+    
+    logger.info("="*50)
+    logger.info("🔧 INFORMATIONS SYSTÈME")
+    logger.info("="*50)
+    logger.info(f"📦 Application: {AppConfig.NAME} v{AppConfig.VERSION}")
+    logger.info(f"🐍 Python: {sys.version}")
+    logger.info(f"💾 Mémoire: {memory_usage_mb():.1f} MB")
+    logger.info(f"📁 Exports: {AppConfig.EXPORTS_DIR}")
+    logger.info(f"📋 Logs: {AppConfig.LOGS_DIR}")
+    logger.info("="*50)
+
+
+def validate_system_requirements() -> Dict:
+    """Valide les prérequis système"""
+    checks = {
+        'python_version': sys.version_info >= (3, 8),
+        'directories_writable': all([
+            AppConfig.EXPORTS_DIR.exists() or AppConfig.EXPORTS_DIR.parent.exists(),
+            AppConfig.LOGS_DIR.exists() or AppConfig.LOGS_DIR.parent.exists()
+        ]),
+        'memory_available': memory_usage_mb() < AppConfig.SYSTEM_LIMITS['max_memory_usage_mb']
+    }
+    
+    return {
+        'all_checks_passed': all(checks.values()),
+        'individual_checks': checks,
+        'recommendations': [
+            "Utilisez Python 3.8 ou supérieur" if not checks['python_version'] else None,
+            "Vérifiez les permissions de dossiers" if not checks['directories_writable'] else None,
+            "Libérez de la mémoire" if not checks['memory_available'] else None
+        ]
+    }
+    for i in range(0, len(data_list), chunk_size):
+        chunks
