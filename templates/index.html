@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Malaysia Electricity Generator v3.0 - Refactorisé</title>
+    <title>Malaysia Electricity Generator</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
@@ -194,8 +194,8 @@
         <!-- En-tête -->
         <div class="text-center mb-4">
             <h1 class="mb-2">🇲🇾 Malaysia Electricity Generator</h1>
-            <p class="lead text-muted">Version 3.0 - Refactorisée et Simplifiée</p>
-            <div class="badge bg-success">4 Fichiers d'Export Distincts + Cartographie Intelligente</div>
+            <p class="lead text-muted">Consommation d'électricité et d'eau</p>
+            <div class="badge bg-success">Fichiers d'Export Distincts et cartographie Intelligente</div>
         </div>
 
         <!-- Statut de l'application -->
@@ -220,7 +220,7 @@
                 </div>
                 <div class="col-md-6 d-flex align-items-end">
                     <button id="btn-load-buildings" class="btn btn-primary" disabled>
-                        📍 Charger les Bâtiments OSM
+                        Charger les Bâtiments OSM
                     </button>
                 </div>
             </div>
@@ -232,10 +232,10 @@
             <!-- Carte OSM avec contrôles intelligents -->
             <div id="map-container" class="mt-4 hidden">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                    <h6 class="mb-0">🗺️ Carte Interactive des Bâtiments</h6>
+                    <h6 class="mb-0">Carte Interactive des Bâtiments</h6>
                     <div>
                         <button id="btn-toggle-map" class="btn btn-outline-secondary btn-sm">
-                            👁️ Masquer la carte
+                            Masquer la carte
                         </button>
                         <span class="badge bg-info ms-2" id="map-building-count">0 bâtiments</span>
                     </div>
@@ -507,7 +507,7 @@
         // ============================================================================
         
         async function initializeApp() {
-            logMessage('🚀 Initialisation de l\'application...');
+            logMessage('Initialisation de l\'application...');
             
             try {
                 // Vérifier le statut
