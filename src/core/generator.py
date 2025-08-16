@@ -5,7 +5,9 @@ GÉNÉRATEURS DE DONNÉES - CORE MODULE
 ====================================
 
 Modules core pour la génération des données électriques, météorologiques et eau.
-Séparation claire: ElectricityGenerator, WeatherGenerator, WaterGenerator.
+ElectricityGenerator : pour électricité
+ WeatherGenerator : pour météo
+ WaterGenerator : pour eau
 """
 
 import time
@@ -56,12 +58,12 @@ class ElectricityGenerator:
         self.generation_count += 1
         
         try:
-            logger.info(f"⚡ Génération consommation: {len(buildings)} bâtiments")
-            logger.info(f"📅 Période: {start_date} → {end_date} ({frequency})")
+            logger.info(f"Génération consommation: {len(buildings)} bâtiments")
+            logger.info(f"Période: {start_date} → {end_date} ({frequency})")
             
             # Création de l'index temporel
             date_range = pd.date_range(start=start_date, end=end_date, freq=frequency)
-            logger.info(f"📊 {len(date_range)} points temporels à générer")
+            logger.info(f"{len(date_range)} points temporels à générer")
             
             # Génération des données
             consumption_data = []
@@ -233,12 +235,12 @@ class WeatherGenerator:
         self.generation_count += 1
         
         try:
-            logger.info(f"🌤️ Génération météo: {station_count} stations")
-            logger.info(f"📅 Période: {start_date} → {end_date} ({frequency})")
+            logger.info(f"Génération météo: {station_count} stations")
+            logger.info(f"Période: {start_date} → {end_date} ({frequency})")
             
             # Création de l'index temporel
             date_range = pd.date_range(start=start_date, end=end_date, freq=frequency)
-            logger.info(f"📊 {len(date_range)} observations par station")
+            logger.info(f"{len(date_range)} observations par station")
             
             weather_data = []
             
@@ -291,7 +293,7 @@ class WeatherGenerator:
             """
             station_data = []
             
-            # CORRECTION: Utilisation de WeatherConfig.CLIMATE_PARAMS
+            
             climate = WeatherConfig.CLIMATE_PARAMS
             
             for timestamp in date_range:
@@ -327,7 +329,7 @@ class WeatherGenerator:
                             if np.random.random() < precip_prob 
                             else 0)
                 rain = precipitation
-                snowfall = 0  # Pas de neige en Malaysia
+                snowfall = 0 
                 snow_depth = 0
                 
                 # === CODE MÉTÉO ===
@@ -441,7 +443,7 @@ class WeatherGenerator:
     
     def _calculate_heat_index(self, temp_c: float, humidity: float) -> float:
         """
-        Calcule l'indice de chaleur (température apparente) - VERSION CORRIGÉE
+        Calcule l'indice de chaleur (température apparente)
         
         Args:
             temp_c: Température en Celsius
@@ -465,7 +467,7 @@ class WeatherGenerator:
                   0.00122874 * temp_f * temp_f * rh + 0.00085282 * temp_f * rh * rh -
                   0.00000199 * temp_f * temp_f * rh * rh)
         
-        # Conversion retour en Celsius - PARTIE MANQUANTE CORRIGÉE
+        # Conversion retour en Celsius
         hi_celsius = (hi - 32) * 5/9
         
         return hi_celsius
@@ -506,12 +508,12 @@ class WaterGenerator:
         self.generation_count += 1
         
         try:
-            logger.info(f"💧 Génération consommation eau: {len(buildings)} bâtiments")
-            logger.info(f"📅 Période: {start_date} → {end_date} ({frequency})")
+            logger.info(f"Génération consommation eau: {len(buildings)} bâtiments")
+            logger.info(f"Période: {start_date} → {end_date} ({frequency})")
             
             # Création de l'index temporel
             date_range = pd.date_range(start=start_date, end=end_date, freq=frequency)
-            logger.info(f"📊 {len(date_range)} points temporels à générer")
+            logger.info(f"{len(date_range)} points temporels à générer")
             
             # Génération des données
             water_data = []
