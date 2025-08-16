@@ -4,7 +4,7 @@
 OSM HANDLER AVEC LA MÉTHODE ADMINISTRATIVE
 ===================================================
 
-
+récupération des batiments par code administratif OSM
 """
 
 import requests
@@ -50,7 +50,7 @@ class OSMHandler:
         """
         start_time = time.time()
         
-        logger.info(f"🎯 Méthode administrative pour: {zone_name}")
+        logger.info(f"Méthode administrative pour: {zone_name}")
         
         # Relations administratives OSM validées (CORRIGÉES)
         administrative_relations = {
@@ -82,7 +82,7 @@ class OSMHandler:
         
         if not relation_id:
             logger.error(f"❌ Pas de relation administrative OSM pour {zone_name}")
-            logger.info(f"📋 Relations disponibles: {list(administrative_relations.keys())}")
+            logger.info(f"Relations disponibles: {list(administrative_relations.keys())}")
             return {
                 'success': False,
                 'error': f"Relation administrative non disponible pour {zone_name}",
@@ -90,7 +90,7 @@ class OSMHandler:
                 'available_zones': list(administrative_relations.keys())
             }
         
-        logger.info(f"🎯 Utilisation relation OSM administrative: {relation_id}")
+        logger.info(f"Utilisation relation OSM administrative: {relation_id}")
         
         # REQUÊTE OVERPASS
         query = f"""[out:json][timeout:300];
@@ -99,16 +99,16 @@ map_to_area->.admin_area;
 way["building"](area.admin_area);
 out geom;"""
         
-        logger.info(f"📝 Requête administrative: relation({relation_id}) → area → buildings")
+        logger.info(f"Requête administrative: relation({relation_id}) → area → buildings")
         
         try:
             osm_data = self._execute_query(query.strip())
             elements = osm_data.get('elements', [])
             
-            logger.info(f"📋 Éléments OSM reçus (administrative): {len(elements):,}")
+            logger.info(f"Éléments OSM reçus (administrative): {len(elements):,}")
             
             if len(elements) == 0:
-                logger.warning("⚠️ Relation administrative trouvée mais aucun bâtiment")
+                logger.warning("Relation administrative trouvée mais aucun bâtiment")
                 return {
                     'success': False,
                     'error': "Relation administrative valide mais sans bâtiments",
@@ -118,7 +118,7 @@ out geom;"""
             
             buildings = self._process_buildings_data(elements, zone_name)
             
-            logger.info(f"🏗️ Bâtiments traités (administrative): {len(buildings):,}")
+            logger.info(f"Bâtiments traités (administrative): {len(buildings):,}")
             
             return {
                 'success': True,
@@ -169,8 +169,8 @@ out geom;"""
                         headers={'Content-Type': 'text/plain; charset=utf-8'}
                     )
                     
-                    logger.info(f"📡 Statut HTTP: {response.status_code}")
-                    logger.info(f"📊 Taille réponse: {len(response.content)} bytes")
+                    logger.info(f"Statut HTTP: {response.status_code}")
+                    logger.info(f"Taille réponse: {len(response.content)} bytes")
                     
                     if response.status_code == 200:
                         result = response.json()
@@ -178,19 +178,19 @@ out geom;"""
                         logger.info(f"✅ Succès: {elements_count} éléments reçus")
                         return result
                     else:
-                        logger.warning(f"⚠️ HTTP {response.status_code}: {response.text[:200]}")
+                        logger.warning(f"HTTP {response.status_code}: {response.text[:200]}")
                         last_error = f"HTTP {response.status_code}"
                         
                 except requests.exceptions.Timeout:
-                    logger.warning(f"⏰ Timeout sur {api_url}")
+                    logger.warning(f"Timeout sur {api_url}")
                     last_error = "Timeout"
                     
                 except requests.exceptions.RequestException as e:
-                    logger.warning(f"🌐 Erreur réseau sur {api_url}: {e}")
+                    logger.warning(f"Erreur réseau sur {api_url}: {e}")
                     last_error = f"Erreur réseau: {e}"
                     
                 except json.JSONDecodeError as e:
-                    logger.warning(f"📝 JSON invalide de {api_url}: {e}")
+                    logger.warning(f"JSON invalide de {api_url}: {e}")
                     last_error = f"JSON invalide: {e}"
                     
                 except Exception as e:
@@ -376,14 +376,14 @@ out geom;"""
         
     def fetch_buildings_from_relation(self, zone_name: str) -> Dict:
         """
-        🥇 MÉTHODE ADMINISTRATIVE: Utilise les relations OSM officielles
+        MÉTHODE ADMINISTRATIVE: Utilise les relations OSM officielles
         
-        À ajouter dans la classe OSMHandler existante de gen_malaysia
+        
         """
         import time
         start_time = time.time()
         
-        logger.info(f"🎯 Méthode administrative pour: {zone_name}")
+        logger.info(f"Méthode administrative pour: {zone_name}")
         
         # Relations administratives OSM validées (CORRIGÉES)
         administrative_relations = {
@@ -415,7 +415,7 @@ out geom;"""
         
         if not relation_id:
             logger.error(f"❌ Pas de relation administrative OSM pour {zone_name}")
-            logger.info(f"📋 Relations disponibles: {list(administrative_relations.keys())}")
+            logger.info(f"Relations disponibles: {list(administrative_relations.keys())}")
             return {
                 'success': False,
                 'error': f"Relation administrative non disponible pour {zone_name}",
@@ -425,14 +425,14 @@ out geom;"""
         
         logger.info(f"🎯 Utilisation relation OSM administrative: {relation_id}")
         
-        # REQUÊTE OVERPASS CORRIGÉE (syntaxe simplifiée qui FONCTIONNE)
+        # REQUÊTE OVERPASS
         query = f"""[out:json][timeout:300];
     relation({relation_id});
     map_to_area->.admin_area;
     way["building"](area.admin_area);
     out geom;"""
         
-        logger.info(f"📝 Requête administrative: relation({relation_id}) → area → buildings")
+        logger.info(f"Requête administrative: relation({relation_id}) → area → buildings")
         
         try:
             # Utiliser la méthode _execute_query existante si elle existe
