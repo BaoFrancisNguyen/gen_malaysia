@@ -22,7 +22,7 @@ class AppConfig:
     
     # Métadonnées application
     NAME = 'Malaysia Electricity Data Generator'
-    
+    VERSION = '1'
     DESCRIPTION = 'Générateur de données de consommation pour Malaysie'
     
     # Chemins du projet
