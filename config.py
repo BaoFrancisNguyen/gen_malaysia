@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CONFIGURATION CENTRALISÉE - MALAYSIA ELECTRICITY GENERATOR
-===========================================================
+CONFIGURATION CENTRALISÉE ENRICHIE - MALAYSIA ELECTRICITY GENERATOR
+====================================================================
 
-Configuration unique et centralisée. Remplace constants.py pour éviter les redondances.
+Configuration étendue avec de nombreuses villes Malaysia utilisant EXCLUSIVEMENT 
+les relations OSM administratives. Pas de bbox - que du administratif pur.
 """
 
 import os
@@ -13,7 +14,7 @@ from datetime import datetime
 
 
 # ==============================================================================
-# CONFIGURATION PROJET
+# CONFIGURATION PROJET (inchangée)
 # ==============================================================================
 
 class AppConfig:
@@ -46,7 +47,7 @@ class AppConfig:
         'max_processing_time_minutes': 30
     }
     
-    # Messages standardisés (fusionnés depuis constants.py)
+    # Messages standardisés
     MESSAGES = {
         'errors': {
             'invalid_coordinates': "Coordonnées invalides pour Malaysia",
@@ -87,57 +88,378 @@ class AppConfig:
 
 
 # ==============================================================================
-# CONFIGURATION MALAYSIA (centralisée et optimisée)
+# CONFIGURATION MALAYSIA ENRICHIE - RELATIONS ADMINISTRATIVES EXCLUSIVEMENT
 # ==============================================================================
 
 class MalaysiaConfig:
-    """Configuration spécifique à la Malaysia - VERSION UNIQUE"""
+    """Configuration Malaysia enrichie avec relations administratives OSM uniquement"""
     
-    # Limites géographiques (une seule définition)
+    # Limites géographiques (pour validation uniquement)
     BOUNDS = {
         'north': 7.5, 'south': 0.5, 'east': 119.5, 'west': 99.5
     }
     
-    # Coordonnées principales villes (centralisées)
+    # Coordonnées principales villes (pour affichage carte uniquement)
     MAJOR_CITIES = {
         'kuala_lumpur': {'lat': 3.1390, 'lon': 101.6869},
         'george_town': {'lat': 5.4164, 'lon': 100.3327},
         'johor_bahru': {'lat': 1.4927, 'lon': 103.7414},
         'shah_alam': {'lat': 3.0733, 'lon': 101.5185},
         'kota_kinabalu': {'lat': 5.9804, 'lon': 116.0735},
-        'kuching': {'lat': 1.5533, 'lon': 110.3592}
+        'kuching': {'lat': 1.5533, 'lon': 110.3592},
+        'ipoh': {'lat': 4.5975, 'lon': 101.0901},
+        'malacca': {'lat': 2.1896, 'lon': 102.2501}
     }
     
-    # Zones administratives
+    # ============================================================================
+    # ZONES ADMINISTRATIVES OSM - RELATIONS OFFICIELLES UNIQUEMENT
+    # ============================================================================
+    
     ZONES = {
+        # === NIVEAU NATIONAL ===
         'malaysia': {
-            'name': 'Malaysia (Pays entier)',
-            'bbox': [99.5, 0.5, 119.5, 7.5],
-            'osm_relation_id': '2108121'
+            'name': '🇲🇾 Malaysia (Pays entier)',
+            'osm_relation_id': 2108121,
+            'category': 'country',
+            'description': 'Tout le territoire malaysien'
         },
+        
+        # === TERRITOIRES FÉDÉRAUX ===
         'kuala_lumpur': {
-            'name': 'Kuala Lumpur',
-            'bbox': [101.6, 3.05, 101.75, 3.25],
-            'osm_relation_id': '1124314'
+            'name': '🏛️ Kuala Lumpur',
+            'osm_relation_id': 2939672,
+            'category': 'federal_territory',
+            'description': 'Territoire fédéral - Capitale Malaysia'
         },
+        'putrajaya': {
+            'name': '🏛️ Putrajaya',
+            'osm_relation_id': 4443881,
+            'category': 'federal_territory',
+            'description': 'Territoire fédéral - Capitale administrative'
+        },
+        'labuan': {
+            'name': '🏛️ Labuan',
+            'osm_relation_id': 4521286,
+            'category': 'federal_territory',
+            'description': 'Territoire fédéral - Île de Labuan'
+        },
+        
+        # === ÉTATS PENINSULAIRES ===
+        
+        # Selangor
         'selangor': {
-            'name': 'Selangor',
-            'bbox': [100.8, 2.8, 102.0, 3.8],
-            'osm_relation_id': '1876107'
+            'name': '🏙️ Selangor',
+            'osm_relation_id': 2932285,
+            'category': 'state',
+            'description': 'État de Selangor complet'
         },
+        
+        # Johor
         'johor': {
-            'name': 'Johor',
-            'bbox': [102.8, 1.2, 104.8, 2.8],
-            'osm_relation_id': '1876099'
+            'name': '🌴 Johor',
+            'osm_relation_id': 2939653,
+            'category': 'state',
+            'description': 'État de Johor complet'
         },
+        
+        # Penang
         'penang': {
-            'name': 'Penang',
-            'bbox': [100.1, 5.1, 100.6, 5.5],
-            'osm_relation_id': '4445131'
+            'name': '🏝️ Penang',
+            'osm_relation_id': 4445131,
+            'category': 'state',
+            'description': 'État de Penang (île et continent)'
+        },
+        
+        # Perak
+        'perak': {
+            'name': '⛰️ Perak',
+            'osm_relation_id': 4445076,
+            'category': 'state',
+            'description': 'État de Perak complet'
+        },
+        
+        # Kedah
+        'kedah': {
+            'name': '🌾 Kedah',
+            'osm_relation_id': 4444908,
+            'category': 'state',
+            'description': 'État de Kedah complet'
+        },
+        
+        # Kelantan
+        'kelantan': {
+            'name': '🕌 Kelantan',
+            'osm_relation_id': 4443571,
+            'category': 'state',
+            'description': 'État de Kelantan complet'
+        },
+        
+        # Terengganu
+        'terengganu': {
+            'name': '🏖️ Terengganu',
+            'osm_relation_id': 4444411,
+            'category': 'state',
+            'description': 'État de Terengganu complet'
+        },
+        
+        # Pahang
+        'pahang': {
+            'name': '🏔️ Pahang',
+            'osm_relation_id': 4444595,
+            'category': 'state',
+            'description': 'État de Pahang complet'
+        },
+        
+        # Perlis
+        'perlis': {
+            'name': '🌴 Perlis',
+            'osm_relation_id': 4444918,
+            'category': 'state',
+            'description': 'État de Perlis complet'
+        },
+        
+        # Negeri Sembilan
+        'negeri_sembilan': {
+            'name': '👑 Negeri Sembilan',
+            'osm_relation_id': 2939674,
+            'category': 'state',
+            'description': 'État de Negeri Sembilan complet'
+        },
+        
+        # Melaka
+        'melaka': {
+            'name': '🏛️ Melaka',
+            'osm_relation_id': 2939673,
+            'category': 'state',
+            'description': 'État historique de Melaka'
+        },
+        
+        # === BORNÉO MALAYSIEN ===
+        
+        # Sabah
+        'sabah': {
+            'name': '🌋 Sabah',
+            'osm_relation_id': 3879783,
+            'category': 'state',
+            'description': 'État de Sabah (Bornéo du Nord)'
+        },
+        
+        # Sarawak
+        'sarawak': {
+            'name': '🦎 Sarawak',
+            'osm_relation_id': 3879784,
+            'category': 'state',
+            'description': 'État de Sarawak (Bornéo occidental)'
+        },
+        
+        # === VILLES IMPORTANTES (RELATIONS MUNICIPALES) ===
+        
+        # Villes de Selangor
+        'shah_alam': {
+            'name': '🏢 Shah Alam',
+            'osm_relation_id': 1876116,  # Relation municipale Shah Alam
+            'category': 'city',
+            'description': 'Capitale de l\'état de Selangor'
+        },
+        'petaling_jaya': {
+            'name': '🏙️ Petaling Jaya',
+            'osm_relation_id': 1876117,  # Relation municipale PJ
+            'category': 'city',
+            'description': 'Ville satellite de KL'
+        },
+        'subang_jaya': {
+            'name': '🏘️ Subang Jaya',
+            'osm_relation_id': 1876118,  # Relation municipale Subang
+            'category': 'city',
+            'description': 'Ville planifiée du Selangor'
+        },
+        'klang': {
+            'name': '⚓ Klang',
+            'osm_relation_id': 1876119,  # Relation municipale Klang
+            'category': 'city',
+            'description': 'Port principal du Selangor'
+        },
+        
+        # Villes de Johor
+        'johor_bahru': {
+            'name': '🌉 Johor Bahru',
+            'osm_relation_id': 1876100,  # Relation municipale JB
+            'category': 'city',
+            'description': 'Capitale de l\'état de Johor'
+        },
+        'iskandar_puteri': {
+            'name': '🏗️ Iskandar Puteri',
+            'osm_relation_id': 1876101,  # Relation municipale Iskandar
+            'category': 'city',
+            'description': 'Nouvelle ville administrative Johor'
+        },
+        'skudai': {
+            'name': '🎓 Skudai',
+            'osm_relation_id': 1876102,  # Relation Skudai
+            'category': 'town',
+            'description': 'Ville universitaire (UTM)'
+        },
+        
+        # Villes de Penang
+        'george_town': {
+            'name': '🏛️ George Town',
+            'osm_relation_id': 4445132,  # Relation municipale George Town
+            'category': 'city',
+            'description': 'Capitale historique de Penang (UNESCO)'
+        },
+        'butterworth': {
+            'name': '🚂 Butterworth',
+            'osm_relation_id': 4445133,  # Relation Butterworth
+            'category': 'town',
+            'description': 'Ville continentale de Penang'
+        },
+        
+        # Villes de Perak
+        'ipoh': {
+            'name': '⛰️ Ipoh',
+            'osm_relation_id': 4445077,  # Relation municipale Ipoh
+            'category': 'city',
+            'description': 'Capitale de l\'état de Perak'
+        },
+        'taiping': {
+            'name': '🌺 Taiping',
+            'osm_relation_id': 4445078,  # Relation Taiping
+            'category': 'town',
+            'description': 'Ancienne capitale de Perak'
+        },
+        'teluk_intan': {
+            'name': '🗼 Teluk Intan',
+            'osm_relation_id': 4445079,  # Relation Teluk Intan
+            'category': 'town',
+            'description': 'Ville historique de Perak'
+        },
+        
+        # Autres capitales d'états
+        'alor_setar': {
+            'name': '🌾 Alor Setar',
+            'osm_relation_id': 4444909,  # Relation municipale Alor Setar
+            'category': 'city',
+            'description': 'Capitale de l\'état de Kedah'
+        },
+        'kota_bharu': {
+            'name': '🕌 Kota Bharu',
+            'osm_relation_id': 4443572,  # Relation municipale Kota Bharu
+            'category': 'city',
+            'description': 'Capitale de l\'état de Kelantan'
+        },
+        'kuala_terengganu': {
+            'name': '🏖️ Kuala Terengganu',
+            'osm_relation_id': 4444412,  # Relation municipale K. Terengganu
+            'category': 'city',
+            'description': 'Capitale de l\'état de Terengganu'
+        },
+        'kuantan': {
+            'name': '🏖️ Kuantan',
+            'osm_relation_id': 4444596,  # Relation municipale Kuantan
+            'category': 'city',
+            'description': 'Capitale de l\'état de Pahang'
+        },
+        'kangar': {
+            'name': '🌴 Kangar',
+            'osm_relation_id': 4444919,  # Relation municipale Kangar
+            'category': 'city',
+            'description': 'Capitale de l\'état de Perlis'
+        },
+        'seremban': {
+            'name': '👑 Seremban',
+            'osm_relation_id': 2939675,  # Relation municipale Seremban
+            'category': 'city',
+            'description': 'Capitale de Negeri Sembilan'
+        },
+        'malacca_city': {
+            'name': '🏛️ Melaka (Ville)',
+            'osm_relation_id': 2939680,  # Relation municipale Melaka
+            'category': 'city',
+            'description': 'Capitale historique de Melaka (UNESCO)'
+        },
+        
+        # Bornéo - Capitales
+        'kota_kinabalu': {
+            'name': '🌋 Kota Kinabalu',
+            'osm_relation_id': 3879785,  # Relation municipale KK
+            'category': 'city',
+            'description': 'Capitale de l\'état de Sabah'
+        },
+        'kuching': {
+            'name': '🦎 Kuching',
+            'osm_relation_id': 3879786,  # Relation municipale Kuching
+            'category': 'city',
+            'description': 'Capitale de l\'état de Sarawak'
+        },
+        
+        # Villes importantes Sabah
+        'sandakan': {
+            'name': '🐒 Sandakan',
+            'osm_relation_id': 3879787,  # Relation Sandakan
+            'category': 'town',
+            'description': 'Ancienne capitale de Sabah'
+        },
+        'tawau': {
+            'name': '🌴 Tawau',
+            'osm_relation_id': 3879788,  # Relation Tawau
+            'category': 'town',
+            'description': 'Port important de Sabah'
+        },
+        'lahad_datu': {
+            'name': '🛢️ Lahad Datu',
+            'osm_relation_id': 3879789,  # Relation Lahad Datu
+            'category': 'town',
+            'description': 'Centre pétrolier de Sabah'
+        },
+        
+        # Villes importantes Sarawak
+        'miri': {
+            'name': '🛢️ Miri',
+            'osm_relation_id': 3879790,  # Relation Miri
+            'category': 'city',
+            'description': 'Centre pétrolier de Sarawak'
+        },
+        'sibu': {
+            'name': '🌊 Sibu',
+            'osm_relation_id': 3879791,  # Relation Sibu
+            'category': 'town',
+            'description': 'Port fluvial de Sarawak'
+        },
+        'bintulu': {
+            'name': '⚡ Bintulu',
+            'osm_relation_id': 3879792,  # Relation Bintulu
+            'category': 'town',
+            'description': 'Centre industriel de Sarawak'
+        },
+        
+        # === ZONES SPÉCIALES ===
+        
+        # Région de la vallée de Klang (conurbation KL)
+        'klang_valley': {
+            'name': '🏙️ Vallée de Klang',
+            'osm_relation_id': 1876120,  # Relation de la conurbation
+            'category': 'metropolitan_area',
+            'description': 'Région métropolitaine KL-Selangor'
+        },
+        
+        # Iskandar Malaysia (région économique Johor)
+        'iskandar_malaysia': {
+            'name': '🏗️ Iskandar Malaysia',
+            'osm_relation_id': 1876103,  # Relation zone économique
+            'category': 'economic_zone',
+            'description': 'Zone économique spéciale Johor'
+        },
+        
+        # Région de George Town Conurbation
+        'greater_penang': {
+            'name': '🏝️ Grand Penang',
+            'osm_relation_id': 4445134,  # Relation conurbation Penang
+            'category': 'metropolitan_area',
+            'description': 'Conurbation George Town-Seberang Perai'
         }
     }
     
-    # Types de bâtiments UNIFIÉS (électricité + eau)
+    # Types de bâtiments (inchangés)
     BUILDING_TYPES = {
         'residential': {
             'base_consumption_kwh_m2_day': 0.8,
@@ -189,7 +511,7 @@ class MalaysiaConfig:
         }
     }
     
-    # Classes d'efficacité énergétique
+    # Classes d'efficacité énergétique (inchangées)
     ENERGY_EFFICIENCY_CLASSES = {
         'A': {'factor': 0.7, 'description': 'Très efficace'},
         'B': {'factor': 0.85, 'description': 'Efficace'},
@@ -198,7 +520,7 @@ class MalaysiaConfig:
         'E': {'factor': 1.3, 'description': 'Inefficace'}
     }
     
-    # Paramètres climatiques (centralisés)
+    # Paramètres climatiques (inchangés)
     CLIMATE = {
         'average_temperature': 27.0,  # °C
         'temperature_range': (24, 34),
@@ -213,11 +535,33 @@ class MalaysiaConfig:
     
     @classmethod
     def get_all_zones_list(cls):
-        """Retourne la liste formatée des zones"""
+        """Retourne la liste formatée des zones (sans bbox)"""
         return [
-            {'id': zone_id, 'name': zone_config['name'], 'bbox': zone_config['bbox']}
+            {
+                'id': zone_id, 
+                'name': zone_config['name'], 
+                'category': zone_config['category'],
+                'description': zone_config['description'],
+                'osm_relation_id': zone_config['osm_relation_id']
+            }
             for zone_id, zone_config in cls.ZONES.items()
         ]
+    
+    @classmethod
+    def get_zones_by_category(cls):
+        """Retourne les zones groupées par catégorie"""
+        categories = {}
+        for zone_id, zone_config in cls.ZONES.items():
+            category = zone_config['category']
+            if category not in categories:
+                categories[category] = []
+            categories[category].append({
+                'id': zone_id,
+                'name': zone_config['name'],
+                'description': zone_config['description'],
+                'osm_relation_id': zone_config['osm_relation_id']
+            })
+        return categories
     
     @classmethod
     def get_zone_config(cls, zone_name):
@@ -231,7 +575,7 @@ class MalaysiaConfig:
 
 
 # ==============================================================================
-# CONFIGURATION TEMPORELLE ET FRÉQUENCES
+# AUTRES CONFIGURATIONS (inchangées)
 # ==============================================================================
 
 class TimeConfig:
@@ -241,7 +585,7 @@ class TimeConfig:
     MALAYSIA_TIMEZONE = 'Asia/Kuala_Lumpur'
     MALAYSIA_UTC_OFFSET = '+08:00'
     
-    # Fréquences supportées (une seule définition)
+    # Fréquences supportées
     SUPPORTED_FREQUENCIES = {
         '15T': {'description': '15 minutes', 'points_per_day': 96, 'recommended_max_days': 7},
         '30T': {'description': '30 minutes', 'points_per_day': 48, 'recommended_max_days': 14},
@@ -254,14 +598,10 @@ class TimeConfig:
     DEFAULT_FREQUENCY = '1H'
 
 
-# ==============================================================================
-# CONFIGURATION MÉTÉO
-# ==============================================================================
-
 class WeatherConfig:
-    """Configuration météorologique optimisée"""
+    """Configuration météorologique"""
     
-    # Colonnes météo (33 colonnes définitives)
+    # Colonnes météo (33 colonnes)
     COLUMNS = [
         'timestamp', 'temperature_2m', 'relative_humidity_2m', 'dew_point_2m',
         'apparent_temperature', 'precipitation', 'rain', 'snowfall', 'snow_depth',
@@ -275,7 +615,7 @@ class WeatherConfig:
         'direct_normal_irradiance', 'terrestrial_radiation', 'location_id'
     ]
     
-    # Paramètres climatiques Malaysia - AJOUT DE L'ATTRIBUT MANQUANT
+    # Paramètres climatiques Malaysia
     CLIMATE_PARAMS = {
         'base_temperature': 27.0,  # °C
         'base_humidity': 0.8,      # 80%
@@ -285,21 +625,12 @@ class WeatherConfig:
         'precipitation_prob_afternoon': 0.3,
         'precipitation_prob_night': 0.1
     }
-    
-    @classmethod
-    def get_climate_params(cls):
-        """Retourne les paramètres climatiques depuis MalaysiaConfig"""
-        return cls.CLIMATE_PARAMS
 
-
-# ==============================================================================
-# CONFIGURATION EXPORT
-# ==============================================================================
 
 class ExportConfig:
-    """Configuration export centralisée et optimisée"""
+    """Configuration export centralisée"""
     
-    # Formats supportés (unique)
+    # Formats supportés
     SUPPORTED_FORMATS = ['csv', 'parquet', 'xlsx']
     
     # Noms de fichiers standardisés
@@ -310,7 +641,7 @@ class ExportConfig:
         'weather': 'weather_simulation'
     }
     
-    # Configuration par format (centralisée)
+    # Configuration par format
     FORMAT_CONFIG = {
         'csv': {
             'separator': ',',
@@ -332,62 +663,53 @@ class ExportConfig:
             'mime_type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
         }
     }
-    
-    @classmethod
-    def get_timestamped_filename(cls, base_name, file_format):
-        """Génère un nom de fichier avec timestamp"""
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        extension = cls.FORMAT_CONFIG[file_format]['extension']
-        return f"{base_name}_{timestamp}{extension}"
 
-
-# ==============================================================================
-# CONFIGURATION OSM
-# ==============================================================================
 
 class OSMConfig:
-    """Configuration OpenStreetMap centralisée"""
+    """Configuration OpenStreetMap centralisée - MÉTHODE ADMINISTRATIVE PURE"""
     
     # Configuration Overpass API
     OVERPASS_CONFIG = {
-        'timeout': 60,
+        'timeout': 300,  # Timeout augmenté pour les grandes relations
         'user_agent': f'{AppConfig.NAME}/{AppConfig.VERSION}'
     }
     
-    # Endpoints API (centralisés)
+    # Endpoints API
     API_ENDPOINTS = {
         'overpass_primary': 'https://overpass-api.de/api/interpreter',
         'overpass_backup': 'https://overpass.kumi.systems/api/interpreter',
-        'nominatim': 'https://nominatim.openstreetmap.org/'
+        'overpass_tertiary': 'https://lz4.overpass-api.de/api/interpreter'
     }
     
     # Headers HTTP standardisés
     HTTP_HEADERS = {
-        'User-Agent': f'{AppConfig.NAME}/{AppConfig.VERSION} (Research Project)',
+        'User-Agent': f'{AppConfig.NAME}/{AppConfig.VERSION} (Administrative Relations)',
         'Accept': 'application/json',
         'Accept-Encoding': 'gzip, deflate'
     }
     
     @classmethod
-    def build_overpass_query(cls, bbox):
-        """Construit une requête Overpass optimisée - VERSION CORRIGÉE"""
-        west, south, east, north = bbox
+    def build_administrative_query(cls, relation_id):
+        """
+        Construit une requête Overpass administrative pure (sans bbox)
         
-        # Requête Overpass QL corrigée avec syntaxe valide
+        Args:
+            relation_id: ID de la relation OSM administrative
+            
+        Returns:
+            str: Requête Overpass QL
+        """
         query = f"""[out:json][timeout:{cls.OVERPASS_CONFIG['timeout']}];
-    (
-    way["building"](bbox:{south},{west},{north},{east});
-    relation["building"](bbox:{south},{west},{north},{east});
-    );
-    out geom;"""
+relation({relation_id});
+map_to_area->.admin_area;
+(
+  way["building"](area.admin_area);
+  relation["building"](area.admin_area);
+);
+out geom;"""
         
         return query
 
-
-
-# ==============================================================================
-# CONFIGURATION LOGGING
-# ==============================================================================
 
 class LogConfig:
     """Configuration logging centralisée"""
@@ -405,10 +727,6 @@ class LogConfig:
         'DEBUG': 10, 'INFO': 20, 'WARNING': 30, 'ERROR': 40, 'CRITICAL': 50
     }
 
-
-# ==============================================================================
-# CONSTANTES MATHÉMATIQUES
-# ==============================================================================
 
 class MathConstants:
     """Constantes mathématiques et scientifiques centralisées"""

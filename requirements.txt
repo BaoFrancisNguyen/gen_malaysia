@@ -1,5 +1,5 @@
-# Malaysia Electricity Generator v3.0 - Requirements
-# Architecture factorisée avec support 4 types de données
+# Malaysia Electricity - requirements
+
 
 # === CORE FRAMEWORK ===
 Flask==3.0.0
@@ -28,18 +28,7 @@ openpyxl==3.1.2        # For Excel format
 # Pour monitoring performance (optionnel)
 psutil==5.9.6          # Memory usage monitoring
 
-# === DEVELOPMENT TOOLS (optionnel) ===
-# Décommentez pour développement
-# pytest==7.4.3
-# pytest-cov==4.1.0
-# black==23.12.0
-# flake8==6.1.0
 
 # === SECURITY (recommandé pour production) ===
 # python-dotenv==1.0.0  # Pour variables d'environnement
 # gunicorn==21.2.0      # Pour déploiement production
-
-# === NOTES ===
-# Python 3.8+ requis
-# Architecture compatible Windows/Linux/macOS
-# Total: ~8 dépendances core + 2 optionnelles

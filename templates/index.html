@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Malaysia Electricity Generator</title>
+    <title>Malaysia Electricity Generator - Zones Enrichies</title>
     
     <!-- Bootstrap CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
@@ -129,7 +129,78 @@
             padding: 15px 20px;
         }
 
-        /* Styles cartographie améliorés */
+        /* Styles pour sélection de zones enrichies */
+        .zone-category {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            background: white;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+        }
+
+        .zone-category h6 {
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 0.8rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e9ecef;
+        }
+
+        .zone-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 0.5rem;
+        }
+
+        .zone-option {
+            padding: 0.75rem;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #f8f9fa;
+        }
+
+        .zone-option:hover {
+            background: #e3f2fd;
+            border-color: #007bff;
+            transform: translateY(-1px);
+        }
+
+        .zone-option.selected {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+
+        .zone-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .zone-description {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-top: 0.25rem;
+        }
+
+        .zone-relation-id {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            font-family: monospace;
+            margin-top: 0.25rem;
+        }
+
+        .category-count {
+            background: #007bff;
+            color: white;
+            padding: 0.2rem 0.6rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* Cartographie */
         #map-container {
             transition: all 0.3s ease;
         }
@@ -167,7 +238,6 @@
         .building-marker.school { background-color: #20c997; }
         .building-marker.hospital { background-color: #dc3545; }
 
-        /* Contrôles cartographie */
         .map-controls {
             position: absolute;
             top: 10px;
@@ -194,8 +264,8 @@
         <!-- En-tête -->
         <div class="text-center mb-4">
             <h1 class="mb-2">🇲🇾 Malaysia Electricity Generator</h1>
-            <p class="lead text-muted">Consommation d'électricité et d'eau</p>
-            <div class="badge bg-success">Fichiers d'Export Distincts et cartographie Intelligente</div>
+            <p class="lead text-muted">Générateur avec zones administratives Malaysia</p>
+            <div class="badge bg-success">Relations OSM Administratives</div>
         </div>
 
         <!-- Statut de l'application -->
@@ -208,22 +278,36 @@
             <small class="text-muted d-block mt-2">Cache: <span id="cache-info">0 bâtiments, 0 points</span></small>
         </div>
 
-        <!-- Étape 1: Sélection Zone -->
+        <!-- Étape 1: Sélection Zone Enrichie -->
         <div class="section-card">
-            <h5><span class="step-number">1</span>Sélection de la Zone Malaysia</h5>
-            <div class="row">
-                <div class="col-md-6">
-                    <label for="zone-select" class="form-label">Choisir une zone :</label>
-                    <select id="zone-select" class="form-select">
-                        <option value="">Chargement des zones...</option>
-                    </select>
-                </div>
-                <div class="col-md-6 d-flex align-items-end">
-                    <button id="btn-load-buildings" class="btn btn-primary" disabled>
-                        Charger les Bâtiments OSM
-                    </button>
+            <h5><span class="step-number">1</span>Sélection Zone Administrative Malaysia</h5>
+            
+            <div class="alert alert-info">
+                <strong>Méthode Administrative</strong><br>
+                Sélectionnez parmi les zones administratives Malaysia.
+            </div>
+
+            <!-- Conteneur des catégories de zones -->
+            <div id="zones-container">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Chargement des zones...</span>
+                    </div>
+                    <p class="mt-2">Chargement des zones administratives...</p>
                 </div>
             </div>
+
+            <!-- Zone sélectionnée et bouton de chargement -->
+            <div id="selection-summary" class="mt-4 hidden">
+                <div class="alert alert-primary">
+                    <strong>Zone sélectionnée:</strong> <span id="selected-zone-name">Aucune</span><br>
+                    <small>Relation OSM: <span id="selected-relation-id">N/A</span></small>
+                </div>
+                <button id="btn-load-buildings" class="btn btn-primary" disabled>
+                    Charger les Bâtiments OSM Administratifs
+                </button>
+            </div>
+
             <div id="buildings-status" class="mt-3 hidden">
                 <span class="status-indicator status-waiting"></span>
                 <span id="buildings-text">Aucun bâtiment chargé</span>
@@ -263,8 +347,7 @@
                 </div>
                 
                 <small class="text-muted mt-1 d-block">
-                    ℹ️ Carte interactive avec échantillonnage intelligent. 
-                    Ajustez la densité pour voir plus ou moins de bâtiments.
+                    ℹ️ Carte interactive avec échantillonnage des bâtiments OSM.
                 </small>
             </div>
         </div>
@@ -409,26 +492,28 @@
     
     <script>
         // ============================================================================
-        // VARIABLES GLOBALES
+        // VARIABLES GLOBALES ENRICHIES
         // ============================================================================
         
         let appState = {
             zones: [],
+            zonesByCategory: {},
             currentBuildings: 0,
             currentConsumption: 0,
             currentWeather: 0,
             currentWater: 0,
             selectedZone: null,
+            selectedZoneConfig: null,
             map: null,
             buildingMarkers: [],
             mapVisible: false,
-            allBuildings: [], // Stockage de tous les bâtiments
-            displayedBuildings: [], // Bâtiments actuellement affichés
-            densityPercentage: 10 // Pourcentage de bâtiments à afficher
+            allBuildings: [],
+            displayedBuildings: [],
+            densityPercentage: 10
         };
 
         // ============================================================================
-        // UTILITAIRES
+        // UTILITAIRES (inchangés)
         // ============================================================================
         
         function logMessage(message, type = 'info') {
@@ -503,11 +588,92 @@
         }
 
         // ============================================================================
+        // GESTION DES ZONES ENRICHIES
+        // ============================================================================
+        
+        function displayZonesByCategory(zonesByCategory) {
+            const container = document.getElementById('zones-container');
+            container.innerHTML = '';
+
+            const categoryOrder = ['country', 'federal_territory', 'state', 'city', 'town', 'metropolitan_area', 'economic_zone'];
+            const categoryLabels = {
+                'country': '🇲🇾 Niveau National',
+                'federal_territory': '🏛️ Territoires Fédéraux',
+                'state': '🗺️ États Malaysia',
+                'city': '🏙️ Villes Principales',
+                'town': '🏘️ Villes Moyennes',
+                'metropolitan_area': '🌆 Aires Métropolitaines',
+                'economic_zone': '🏗️ Zones Économiques'
+            };
+
+            categoryOrder.forEach(category => {
+                if (zonesByCategory[category] && zonesByCategory[category].length > 0) {
+                    const categoryDiv = document.createElement('div');
+                    categoryDiv.className = 'zone-category';
+                    
+                    const zones = zonesByCategory[category];
+                    
+                    categoryDiv.innerHTML = `
+                        <h6>
+                            ${categoryLabels[category]} 
+                            <span class="category-count">${zones.length}</span>
+                        </h6>
+                        <div class="zone-options" id="zones-${category}">
+                        </div>
+                    `;
+                    
+                    container.appendChild(categoryDiv);
+                    
+                    const zoneOptionsDiv = document.getElementById(`zones-${category}`);
+                    
+                    zones.forEach(zone => {
+                        const zoneDiv = document.createElement('div');
+                        zoneDiv.className = 'zone-option';
+                        zoneDiv.setAttribute('data-zone-id', zone.id);
+                        zoneDiv.setAttribute('data-relation-id', zone.osm_relation_id);
+                        
+                        zoneDiv.innerHTML = `
+                            <div class="zone-title">${zone.name}</div>
+                            <div class="zone-description">${zone.description}</div>
+                            <div class="zone-relation-id">OSM: ${zone.osm_relation_id}</div>
+                        `;
+                        
+                        zoneDiv.addEventListener('click', () => selectZone(zone.id, zone));
+                        zoneOptionsDiv.appendChild(zoneDiv);
+                    });
+                }
+            });
+
+            logMessage(`✅ Affichage ${Object.keys(zonesByCategory).length} catégories de zones`, 'success');
+        }
+
+        function selectZone(zoneId, zoneConfig) {
+            // Désélectionner toutes les zones
+            document.querySelectorAll('.zone-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            // Sélectionner la nouvelle zone
+            document.querySelector(`[data-zone-id="${zoneId}"]`).classList.add('selected');
+            
+            appState.selectedZone = zoneId;
+            appState.selectedZoneConfig = zoneConfig;
+            
+            // Mettre à jour l'affichage de sélection
+            document.getElementById('selected-zone-name').textContent = zoneConfig.name;
+            document.getElementById('selected-relation-id').textContent = zoneConfig.osm_relation_id;
+            document.getElementById('selection-summary').classList.remove('hidden');
+            document.getElementById('btn-load-buildings').disabled = false;
+            
+            logMessage(`🎯 Zone sélectionnée: ${zoneConfig.name} (OSM: ${zoneConfig.osm_relation_id})`, 'info');
+        }
+
+        // ============================================================================
         // INITIALISATION
         // ============================================================================
         
         async function initializeApp() {
-            logMessage('Initialisation de l\'application...');
+            logMessage('Initialisation de l\'application enrichie...');
             
             try {
                 // Vérifier le statut
@@ -522,10 +688,10 @@
                 appState.currentWater = status.cache.water_points || 0;
                 updateCacheInfo();
                 
-                // Charger les zones
-                await loadZones();
+                // Charger les zones enrichies
+                await loadEnrichedZones();
                 
-                logMessage('✅ Application initialisée avec succès', 'success');
+                logMessage('✅ Application enrichie initialisée avec succès', 'success');
                 
             } catch (error) {
                 updateStatus('app-status', 'error', 'Erreur d\'initialisation');
@@ -533,52 +699,44 @@
             }
         }
 
-        async function loadZones() {
+        async function loadEnrichedZones() {
             try {
-                logMessage('📍 Chargement des zones Malaysia...');
+                logMessage('📍 Chargement des zones Malaysia enrichies...');
                 
                 const data = await apiCall('/api/zones');
                 appState.zones = data.zones;
                 
-                const zoneSelect = document.getElementById('zone-select');
-                zoneSelect.innerHTML = '<option value="">-- Sélectionner une zone --</option>';
-                
+                // Grouper les zones par catégorie
+                appState.zonesByCategory = {};
                 data.zones.forEach(zone => {
-                    const option = document.createElement('option');
-                    option.value = zone.id;
-                    option.textContent = zone.name;
-                    zoneSelect.appendChild(option);
+                    const category = zone.category || 'other';
+                    if (!appState.zonesByCategory[category]) {
+                        appState.zonesByCategory[category] = [];
+                    }
+                    appState.zonesByCategory[category].push(zone);
                 });
                 
-                logMessage(`✅ ${data.total_zones} zones chargées`, 'success');
+                // Afficher les zones par catégorie
+                displayZonesByCategory(appState.zonesByCategory);
+                
+                logMessage(`✅ ${data.zones.length} zones chargées dans ${Object.keys(appState.zonesByCategory).length} catégories`, 'success');
                 
             } catch (error) {
-                logMessage('❌ Erreur chargement zones', 'error');
+                logMessage('❌ Erreur chargement zones enrichies', 'error');
             }
         }
 
         // ============================================================================
-        // GESTION DES ÉVÉNEMENTS
+        // GESTION DES ÉVÉNEMENTS 
         // ============================================================================
         
-        document.getElementById('zone-select').addEventListener('change', function() {
-            const selectedZone = this.value;
-            appState.selectedZone = selectedZone;
-            
-            const btnLoadBuildings = document.getElementById('btn-load-buildings');
-            btnLoadBuildings.disabled = !selectedZone;
-            
-            if (selectedZone) {
-                logMessage(`🗺️ Zone sélectionnée: ${this.options[this.selectedIndex].text}`);
-            }
-        });
-
         document.getElementById('btn-load-buildings').addEventListener('click', async function() {
             if (!appState.selectedZone) return;
             
             this.disabled = true;
-            updateStatus('buildings-status', 'loading', 'Chargement des bâtiments OSM...');
-            logMessage(`🏢 Chargement des bâtiments pour: ${appState.selectedZone}`);
+            updateStatus('buildings-status', 'loading', 'Chargement des bâtiments OSM administratifs...');
+            logMessage(`🏢 Chargement administratif pour: ${appState.selectedZoneConfig.name}`);
+            logMessage(`🎯 Relation OSM: ${appState.selectedZoneConfig.osm_relation_id}`);
             
             try {
                 const data = await apiCall(`/api/buildings/${appState.selectedZone}`, {
@@ -591,9 +749,13 @@
                     updateCacheInfo();
                     
                     updateStatus('buildings-status', 'success', 
-                        `${data.metadata.building_count} bâtiments chargés en ${data.metadata.load_time_seconds.toFixed(1)}s`);
+                        `${data.metadata.building_count} bâtiments chargés en ${data.metadata.load_time_seconds.toFixed(1)}s (méthode: ${data.metadata.method})`);
                     
-                    logMessage(`✅ ${data.metadata.building_count} bâtiments OSM chargés`, 'success');
+                    logMessage(`✅ ${data.metadata.building_count} bâtiments OSM administratifs chargés`, 'success');
+                    
+                    if (data.metadata.relation_id) {
+                        logMessage(`📋 Relation OSM utilisée: ${data.metadata.relation_id}`, 'info');
+                    }
                     
                     // Affichage intelligent sur la carte
                     displayBuildingsIntelligently(appState.allBuildings, appState.selectedZone);
@@ -606,7 +768,7 @@
                 }
                 
             } catch (error) {
-                updateStatus('buildings-status', 'error', 'Erreur chargement bâtiments');
+                updateStatus('buildings-status', 'error', 'Erreur chargement bâtiments administratifs');
                 logMessage(`❌ Erreur chargement: ${error.message}`, 'error');
                 
             } finally {
@@ -614,13 +776,13 @@
             }
         });
 
-        // Gestionnaires cartographie
+        // Gestionnaires cartographie (inchangés)
         document.getElementById('btn-toggle-map').addEventListener('click', toggleMapVisibility);
         document.getElementById('density-slider').addEventListener('input', updateDensityDisplay);
         document.getElementById('btn-refresh-map').addEventListener('click', refreshMapWithDensity);
 
         // ============================================================================
-        // GESTION CARTOGRAPHIE INTELLIGENTE
+        // GESTION CARTOGRAPHIE
         // ============================================================================
         
         function initializeMap() {
@@ -684,7 +846,7 @@
             
             appState.mapVisible = true;
             
-            logMessage(`🗺️ Carte affichée avec échantillonnage intelligent`, 'success');
+            logMessage(`🗺️ Carte affichée avec échantillonnage intelligent (${appState.selectedZoneConfig.name})`, 'success');
         }
         
         function sampleBuildings(buildings, percentage) {
@@ -746,9 +908,9 @@
                             fillOpacity: 0.8
                         });
                         
-                        // Popup avec informations
+                        // Popup avec informations enrichies
                         const popupContent = `
-                            <div style="font-size: 0.9rem; min-width: 180px;">
+                            <div style="font-size: 0.9rem; min-width: 200px;">
                                 <h6 style="margin-bottom: 8px; color: ${color};">${building.building_type.charAt(0).toUpperCase() + building.building_type.slice(1)}</h6>
                                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 0.8rem;">
                                     <span><strong>ID:</strong></span>
@@ -756,7 +918,9 @@
                                     <span><strong>Surface:</strong></span>
                                     <span>${building.surface_area_m2?.toFixed(1) || 'N/A'} m²</span>
                                     <span><strong>Zone:</strong></span>
-                                    <span>${building.zone_name || 'N/A'}</span>
+                                    <span>${building.zone_name || appState.selectedZone}</span>
+                                    <span><strong>Source:</strong></span>
+                                    <span>${building.source || 'osm_administrative'}</span>
                                 </div>
                             </div>
                         `;
@@ -929,7 +1093,7 @@
             if (generateWater) selectedTypes.push('eau');
             if (generateWeather) selectedTypes.push('météo');
             
-            logMessage(`🔄 Génération: ${startDate} → ${endDate} (${frequency})`, 'info');
+            logMessage(`🔄 Génération pour ${appState.selectedZoneConfig.name}: ${startDate} → ${endDate} (${frequency})`, 'info');
             logMessage(`📊 Types sélectionnés: ${selectedTypes.join(', ')}`, 'info');
             if (generateWeather) {
                 logMessage(`🌤️ ${weatherStations} stations météo`, 'info');
@@ -971,7 +1135,7 @@
                     updateStatus('generation-status', 'success', 
                         `✅ Généré: ${generatedTypes.join(', ')}`);
                     
-                    logMessage(`✅ Données générées: ${generatedTypes.join(', ')}`, 'success');
+                    logMessage(`✅ Données générées pour ${appState.selectedZoneConfig.name}: ${generatedTypes.join(', ')}`, 'success');
                     
                     // Activer l'export
                     document.getElementById('btn-export').disabled = false;
@@ -1008,15 +1172,16 @@
             
             const exportFormat = document.getElementById('export-format').value;
             const timestamp = new Date().toISOString().slice(0,16).replace(/[:-]/g, '');
+            const zoneName = appState.selectedZone || 'malaysia';
             
-            logMessage(`💾 Export en format ${exportFormat.toUpperCase()}...`);
+            logMessage(`💾 Export ${exportFormat.toUpperCase()} pour ${appState.selectedZoneConfig.name}...`);
             
             try {
                 const data = await apiCall('/api/export', {
                     method: 'POST',
                     body: JSON.stringify({
                         format: exportFormat,
-                        filename: `malaysia_electricity_${timestamp}`
+                        filename: `malaysia_${zoneName}_${timestamp}`
                     })
                 });
                 
@@ -1024,7 +1189,7 @@
                     updateStatus('export-status', 'success', 
                         `✅ ${data.metadata.total_files} fichiers exportés (${data.metadata.total_size_mb}MB)`);
                     
-                    logMessage(`✅ Export réussi: ${data.metadata.total_files} fichiers (${data.metadata.total_size_mb}MB)`, 'success');
+                    logMessage(`✅ Export réussi pour ${appState.selectedZoneConfig.name}: ${data.metadata.total_files} fichiers (${data.metadata.total_size_mb}MB)`, 'success');
                     
                     // Afficher les fichiers
                     displayExportedFiles(data.files);
@@ -1072,7 +1237,8 @@
                     <h6>${typeNames[file.type] || file.type}</h6>
                     <p class="text-muted mb-2">
                         ${file.records.toLocaleString()} enregistrements<br>
-                        ${file.size_mb.toFixed(2)} MB
+                        ${file.size_mb.toFixed(2)} MB<br>
+                        <small>Zone: ${appState.selectedZoneConfig?.name || 'Malaysia'}</small>
                     </p>
                     <a href="/api/download/${file.name}" class="btn btn-outline-primary btn-sm">
                         📥 Télécharger
@@ -1097,7 +1263,7 @@
         // ============================================================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            logMessage('🔄 Chargement de la page terminé');
+            logMessage('🔄 Chargement de la page avec zones enrichies');
             initializeApp();
             
             // Initialisation des prévisualisations
