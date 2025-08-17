@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-OSM HANDLER AVEC LA MÉTHODE ADMINISTRATIVE
-===================================================
+OSM HANDLER AVEC LA MÉTHODE ADMINISTRATIVE - VERSION MODIFIÉE
+=============================================================
 
-récupération des batiments par code administratif OSM
+Récupération des bâtiments par code administratif OSM avec unique_id.
 """
 
 import requests
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class OSMHandler:
     """
-    Gestionnaire OSM la méthode administrative
+    Gestionnaire OSM avec la méthode administrative
     """
     
     def __init__(self):
@@ -52,7 +52,7 @@ class OSMHandler:
         
         logger.info(f"Méthode administrative pour: {zone_name}")
         
-        # Relations administratives OSM validées (CORRIGÉES)
+        # Relations administratives OSM validées
         administrative_relations = {
             # PAYS
             'malaysia': 2108121,          
@@ -205,6 +205,7 @@ out geom;"""
     def _process_buildings_data(self, elements: List[Dict], zone_name: str) -> List[Dict]:
         """
         Traite les éléments OSM et les convertit en bâtiments
+        VERSION MODIFIÉE: utilise unique_id
         
         Args:
             elements: Éléments OSM bruts
@@ -268,9 +269,9 @@ out geom;"""
                 # Déterminer le type de bâtiment
                 building_type = self._determine_building_type(building_tag, tags)
                 
-                # Créer l'objet bâtiment
+                # Créer l'objet bâtiment (MODIFIÉ: unique_id)
                 building = {
-                    'building_id': f"osm_{element.get('id', processed_count)}",
+                    'unique_id': f"osm_{element.get('id', processed_count)}",
                     'osm_id': element.get('id'),
                     'latitude': center_lat,
                     'longitude': center_lon,
@@ -377,15 +378,14 @@ out geom;"""
     def fetch_buildings_from_relation(self, zone_name: str) -> Dict:
         """
         MÉTHODE ADMINISTRATIVE: Utilise les relations OSM officielles
-        
-        
+        VERSION MODIFIÉE avec unique_id
         """
         import time
         start_time = time.time()
         
         logger.info(f"Méthode administrative pour: {zone_name}")
         
-        # Relations administratives OSM validées (CORRIGÉES)
+        # Relations administratives OSM validées
         administrative_relations = {
             # PAYS
             'malaysia': 2108121,          
@@ -517,6 +517,7 @@ out geom;"""
     def _process_elements_simple(self, elements: List[Dict], zone_name: str) -> List[Dict]:
         """
         Traitement simple des éléments OSM si _process_buildings_data n'existe pas
+        
         """
         buildings = []
         
@@ -564,8 +565,9 @@ out geom;"""
                 else:
                     building_type = 'residential'
                 
+                # utilise unique_id
                 building = {
-                    'building_id': f"osm_{element.get('id', i)}",
+                    'unique_id': f"osm_{element.get('id', i)}",
                     'osm_id': element.get('id'),
                     'latitude': center_lat,
                     'longitude': center_lon,
