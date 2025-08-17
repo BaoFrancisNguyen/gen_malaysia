@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GÉNÉRATEURS DE DONNÉES - CORE MODULE - VERSION MODIFIÉE
+GÉNÉRATEURS DE DONNÉES - CORE MODULE
 =======================================================
 
 Modules core pour la génération des données électriques, météorologiques et eau.
