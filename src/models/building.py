@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-MODÈLE BUILDING - STRUCTURES DE DONNÉES
-========================================
+MODÈLE BUILDING - STRUCTURES DE DONNÉES -
+==========================================================
 
-Modèle de données pour les bâtiments Malaysia. Version optimisée sans redondances.
+Modèle de données pour les bâtiments Malaysia avec unique_id.
 """
 
 import uuid
@@ -21,7 +21,7 @@ from src.utils.helpers import (validate_malaysia_coordinates, generate_building_
 class Building:
     """
     Modèle de données pour un bâtiment avec propriétés énergétiques
-    VERSION OPTIMISÉE - Suppression des redondances avec config et helpers
+    
     """
     
     # Identifiants
@@ -207,10 +207,9 @@ class Building:
         return normalized_profile
     
     def to_dict(self) -> Dict:
-        """Convertit en dictionnaire pour export"""
+        """Convertit en dictionnaire pour export - VERSION MODIFIÉE"""
         return {
-            'id': self.id,
-            'osm_id': self.osm_id,
+            'unique_id': self.id,  # MODIFIÉ: unique_id au lieu de id
             'building_type': self.building_type,
             'latitude': round(self.latitude, 6),
             'longitude': round(self.longitude, 6),
@@ -220,6 +219,7 @@ class Building:
             'energy_efficiency_class': self.energy_efficiency_class,
             'daily_consumption_kwh': round(self.calculate_daily_consumption(), 2),
             'daily_water_consumption_l': round(self.calculate_daily_water_consumption(), 1),
+            'osm_id': self.osm_id,
             'source': self.source,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
@@ -293,7 +293,7 @@ class Building:
 
 
 # ==============================================================================
-# FONCTIONS UTILITAIRES BUILDING (optimisées)
+# FONCTIONS UTILITAIRES BUILDING
 # ==============================================================================
 
 def create_building_from_coordinates(
@@ -549,5 +549,5 @@ def generate_building_summary_report(buildings: List[Building]) -> Dict:
         },
         'type_statistics': type_statistics,
         'generated_at': datetime.now().isoformat(),
-        'report_version': '3.0.0'
+        'report_version': '1.0.0'
     }
