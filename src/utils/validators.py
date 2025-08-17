@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-VALIDATEURS CORRIGÉS - UTILS MODULE
-===================================
+VALIDATEURS - UTILS MODULE 
+==============================================
 
-Correction des validateurs pour résoudre le problème de génération.
+Correction des validateurs pour la nouvelle structure ['unique_id', 'timestamp', 'y', 'frequency'].
 """
 
 import re
@@ -64,9 +64,6 @@ def validate_malaysia_coordinates(latitude: float, longitude: float) -> bool:
     bounds = MalaysiaConfig.BOUNDS
     return (bounds['south'] <= latitude <= bounds['north'] and 
             bounds['west'] <= longitude <= bounds['east'])
-
-
-# NOTE: validate_bbox supprimé car on utilise la méthode administrative OSM, pas les bounding boxes
 
 
 # ==============================================================================
@@ -185,7 +182,7 @@ def validate_building_type(building_type: str) -> bool:
 
 def validate_building_data(building: Dict) -> Dict:
     """
-    Valide les données d'un bâtiment - VERSION SIMPLIFIÉE ET CORRIGÉE
+    Valide les données d'un bâtiment - VERSION MODIFIÉE pour unique_id
     
     Args:
         building: Données du bâtiment
@@ -196,8 +193,8 @@ def validate_building_data(building: Dict) -> Dict:
     errors = []
     warnings = []
     
-    # Validation ID (flexible - plusieurs formats possibles)
-    building_id = building.get('id') or building.get('building_id') or building.get('osm_id')
+    # Validation ID (MODIFIÉ: cherche unique_id en premier)
+    building_id = building.get('unique_id') or building.get('id') or building.get('building_id') or building.get('osm_id')
     if not building_id:
         errors.append("ID manquant")
     
@@ -311,7 +308,8 @@ def validate_building_list(buildings: List[Dict]) -> Dict:
 
 def validate_consumption_data(consumption_df: pd.DataFrame) -> Dict:
     """
-    Valide un DataFrame de consommation
+    Valide un DataFrame de consommation - VERSION MODIFIÉE
+    NOUVELLE STRUCTURE: ['unique_id', 'timestamp', 'y', 'frequency']
     
     Args:
         consumption_df: DataFrame à valider
@@ -329,19 +327,19 @@ def validate_consumption_data(consumption_df: pd.DataFrame) -> Dict:
     warnings = []
     
     # Validation colonnes requises
-    required_columns = ['building_id', 'timestamp', 'consumption_kwh']
+    required_columns = ['unique_id', 'timestamp', 'y']
     missing_columns = [col for col in required_columns if col not in consumption_df.columns]
     
     if missing_columns:
         errors.append(f"Colonnes manquantes: {missing_columns}")
     
     # Validation données
-    if 'consumption_kwh' in consumption_df.columns:
-        negative_count = (consumption_df['consumption_kwh'] < 0).sum()
+    if 'y' in consumption_df.columns:
+        negative_count = (consumption_df['y'] < 0).sum()
         if negative_count > 0:
             warnings.append(f"{negative_count} valeurs négatives")
         
-        extreme_count = (consumption_df['consumption_kwh'] > 100).sum()
+        extreme_count = (consumption_df['y'] > 100).sum()
         if extreme_count > 0:
             warnings.append(f"{extreme_count} valeurs extrêmes (>100 kWh)")
     
@@ -362,7 +360,7 @@ def validate_consumption_data(consumption_df: pd.DataFrame) -> Dict:
 
 def validate_weather_data(weather_df: pd.DataFrame) -> Dict:
     """
-    Valide un DataFrame météorologique
+    Valide un DataFrame météorologique (INCHANGÉ)
     
     Args:
         weather_df: DataFrame à valider
@@ -409,7 +407,8 @@ def validate_weather_data(weather_df: pd.DataFrame) -> Dict:
 
 def validate_water_consumption_data(water_df: pd.DataFrame) -> Dict:
     """
-    Valide un DataFrame de consommation d'eau
+    Valide un DataFrame de consommation d'eau - VERSION MODIFIÉE
+    NOUVELLE STRUCTURE: ['unique_id', 'timestamp', 'y', 'frequency']
     
     Args:
         water_df: DataFrame à valider
@@ -426,32 +425,26 @@ def validate_water_consumption_data(water_df: pd.DataFrame) -> Dict:
     errors = []
     warnings = []
     
-    # Validation colonnes requises
-    required_columns = ['building_id', 'timestamp', 'water_consumption_liters']
+    # Validation colonnes requises (NOUVELLE STRUCTURE)
+    required_columns = ['unique_id', 'timestamp', 'y']
     missing_columns = [col for col in required_columns if col not in water_df.columns]
     
     if missing_columns:
         errors.append(f"Colonnes manquantes: {missing_columns}")
     
-    # Validation données eau
-    if 'water_consumption_liters' in water_df.columns:
-        negative_count = (water_df['water_consumption_liters'] < 0).sum()
+    # Validation données eau (MODIFIÉ: y au lieu de water_consumption_liters)
+    if 'y' in water_df.columns:
+        negative_count = (water_df['y'] < 0).sum()
         if negative_count > 0:
             warnings.append(f"{negative_count} valeurs négatives")
         
-        extreme_count = (water_df['water_consumption_liters'] > 10000).sum()  # >10k L/h
+        extreme_count = (water_df['y'] > 10000).sum()  # >10k L/h
         if extreme_count > 0:
             warnings.append(f"{extreme_count} valeurs extrêmes (>10k L/h)")
         
-        zero_count = (water_df['water_consumption_liters'] == 0).sum()
+        zero_count = (water_df['y'] == 0).sum()
         if zero_count > len(water_df) * 0.5:  # Plus de 50% à zéro
             warnings.append("Beaucoup de valeurs nulles")
-    
-    # Validation intensité eau
-    if 'consumption_intensity_l_m2' in water_df.columns:
-        intensity_issues = (water_df['consumption_intensity_l_m2'] > 50).sum()  # >50 L/m²/h
-        if intensity_issues > 0:
-            warnings.append(f"{intensity_issues} intensités eau très élevées")
     
     return {
         'valid': len(errors) == 0,
@@ -585,25 +578,25 @@ def _estimate_export_size(
     Returns:
         float: Taille estimée en MB
     """
-    # Taille par enregistrement en bytes
+    # Taille par enregistrement en bytes (MODIFIÉ pour nouvelle structure)
     size_estimates = {
         'csv': {
             'buildings': 300,
-            'consumption': 200,
+            'consumption': 120,  # Réduit car moins de colonnes
             'weather': 500,
-            'water': 180
+            'water': 120  # Réduit car moins de colonnes
         },
         'parquet': {
             'buildings': 120,
-            'consumption': 80,
+            'consumption': 50,  # Réduit car moins de colonnes
             'weather': 200,
-            'water': 70
+            'water': 50  # Réduit car moins de colonnes
         },
         'xlsx': {
             'buildings': 400,
-            'consumption': 250,
+            'consumption': 150,  # Réduit car moins de colonnes
             'weather': 600,
-            'water': 220
+            'water': 150  # Réduit car moins de colonnes
         }
     }
     
@@ -660,7 +653,7 @@ def validate_generation_parameters(
         for building in sample:
             if not isinstance(building, dict):
                 sample_errors += 1
-            elif not (building.get('id') or building.get('building_id')):
+            elif not (building.get('unique_id') or building.get('id') or building.get('building_id')):
                 sample_errors += 1
         
         if sample_errors > 3:  # Si plus de 3/5 sont invalides
