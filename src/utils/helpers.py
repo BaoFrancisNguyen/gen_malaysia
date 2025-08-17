@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-FONCTIONS D'AIDE CORRIGÉES - UTILS MODULE
-=========================================
+FONCTIONS D'AIDE - UTILS MODULE -
+==================================================
 
-Version plus permissive pour les bâtiments OSM.
+
 """
 
 import os
@@ -21,7 +21,7 @@ from config import AppConfig, MalaysiaConfig, LogConfig, MathConstants
 
 
 # ==============================================================================
-# GÉNÉRATION D'IDENTIFIANTS (inchangé)
+# GÉNÉRATION D'IDENTIFIANTS
 # ==============================================================================
 
 def generate_unique_id(prefix: str = '', length: int = 8) -> str:
@@ -46,7 +46,7 @@ def generate_session_id() -> str:
 
 
 # ==============================================================================
-# CALCULS GÉOGRAPHIQUES (plus permissifs)
+# CALCULS GÉOGRAPHIQUES
 # ==============================================================================
 
 def validate_malaysia_coordinates(latitude: float, longitude: float) -> bool:
@@ -202,6 +202,7 @@ def safe_get_building_field(building: Dict, field: str, default: Any = None) -> 
 def normalize_building_data(building: Dict) -> Dict:
     """
     Normalise les données d'un bâtiment pour être plus robuste
+    VERSION MODIFIÉE: utilise unique_id
     
     Args:
         building: Données bâtiment brutes
@@ -211,7 +212,7 @@ def normalize_building_data(building: Dict) -> Dict:
     """
     if not isinstance(building, dict):
         return {
-            'id': generate_unique_id('unknown'),
+            'unique_id': generate_unique_id('unknown'),
             'building_type': 'residential',
             'latitude': 3.1390,  # KL par défaut
             'longitude': 101.6869,
@@ -220,8 +221,9 @@ def normalize_building_data(building: Dict) -> Dict:
             'source': 'unknown'
         }
     
-    # Récupération sécurisée des champs essentiels
-    building_id = (safe_get_building_field(building, 'id') or 
+    # Récupération sécurisée des champs essentiels (MODIFIÉ: unique_id en premier)
+    building_id = (safe_get_building_field(building, 'unique_id') or
+                  safe_get_building_field(building, 'id') or 
                   safe_get_building_field(building, 'building_id') or 
                   safe_get_building_field(building, 'osm_id') or
                   generate_unique_id('norm'))
@@ -251,7 +253,7 @@ def normalize_building_data(building: Dict) -> Dict:
     source = safe_get_building_field(building, 'source', 'osm')
     
     return {
-        'id': str(building_id),
+        'unique_id': str(building_id),  # MODIFIÉ: unique_id au lieu de id
         'building_type': building_type,
         'latitude': latitude,
         'longitude': longitude,
@@ -266,6 +268,7 @@ def normalize_building_data(building: Dict) -> Dict:
 def robust_building_list_validation(buildings: List[Dict]) -> List[Dict]:
     """
     Valide et normalise une liste de bâtiments de manière très robuste
+    VERSION MODIFIÉE: utilise unique_id
     
     Args:
         buildings: Liste de bâtiments bruts
@@ -290,7 +293,7 @@ def robust_building_list_validation(buildings: List[Dict]) -> List[Dict]:
             logger.warning(f"Erreur normalisation bâtiment {i}: {e}")
             
             default_building = {
-                'id': generate_unique_id(f'error_{i}'),
+                'unique_id': generate_unique_id(f'error_{i}'),  # MODIFIÉ: unique_id
                 'building_type': 'residential',
                 'latitude': 3.1390 + (i % 10) * 0.001,  # Légère variation
                 'longitude': 101.6869 + (i % 10) * 0.001,
@@ -304,7 +307,7 @@ def robust_building_list_validation(buildings: List[Dict]) -> List[Dict]:
 
 
 # ==============================================================================
-# UTILITAIRES SYSTÈME ET FORMATAGE (inchangés)
+# UTILITAIRES SYSTÈME ET FORMATAGE
 # ==============================================================================
 
 def format_duration(seconds: float) -> str:
@@ -361,7 +364,7 @@ def clean_filename(filename: str) -> str:
 
 
 # ==============================================================================
-# FACTORY PATTERNS POUR MÉTADONNÉES (inchangés)
+# FACTORY PATTERNS POUR MÉTADONNÉES
 # ==============================================================================
 
 def create_metadata_base() -> Dict:
