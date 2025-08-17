@@ -2,10 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 SERVICE D'EXPORT - COUCHE SERVICE
-=================================
+====================================================
 
 Service métier pour orchestrer l'export des données.
-Prépare les DataFrames et coordonne l'export via DataExporter.
+NOUVELLE STRUCTURE: ['unique_id', 'timestamp', 'y', 'frequency']
 """
 
 import logging
@@ -92,7 +92,7 @@ class ExportService:
             weather_df = dataframes_result['weather_df']
             water_df = dataframes_result.get('water_df', pd.DataFrame())
             
-            # Export via DataExporter (mise à jour pour 4 fichiers)
+            # Export via DataExporter
             export_result = self.data_exporter.export_four_datasets(
                 buildings_df=buildings_df,
                 consumption_df=consumption_df,
@@ -184,7 +184,7 @@ class ExportService:
                 weather_df = pd.DataFrame()
                 logger.warning("⚠️ Aucune donnée météo à exporter")
             
-            # 4. Préparation DataFrame eau (NOUVEAU)
+            # 4. Préparation DataFrame eau
             if water_data is not None and not water_data.empty:
                 water_df = self._prepare_water_dataframe(water_data)
                 logger.info(f"💧 DataFrame eau préparé: {len(water_df)} points")
@@ -226,7 +226,7 @@ class ExportService:
         
         # Sélection et ordre des colonnes pour export
         export_columns = [
-            'id',
+            'unique_id',
             'building_type',
             'zone_name',
             'latitude',
@@ -250,15 +250,16 @@ class ExportService:
         if 'surface_area_m2' in df_export.columns:
             df_export['surface_area_m2'] = df_export['surface_area_m2'].round(1)
         
-        # Tri par ID
-        if 'id' in df_export.columns:
-            df_export = df_export.sort_values('id').reset_index(drop=True)
+        # Tri par unique_id
+        if 'unique_id' in df_export.columns:
+            df_export = df_export.sort_values('unique_id').reset_index(drop=True)
         
         return df_export
     
     def _prepare_consumption_dataframe(self, consumption_data: pd.DataFrame) -> pd.DataFrame:
         """
         Prépare le DataFrame de consommation électrique pour export
+        NOUVELLE STRUCTURE: ['unique_id', 'timestamp', 'y', 'frequency']
         
         Args:
             consumption_data: DataFrame de consommation brut
@@ -270,11 +271,10 @@ class ExportService:
         
         # Sélection des colonnes pour export
         export_columns = [
-            'building_id',
-            'timestamp',
-            'consumption_kwh',
-            'building_type',
-            'surface_area_m2'
+            'unique_id',
+            'timestamp', 
+            'y',
+            'frequency'
         ]
         
         # Garder seulement les colonnes existantes
@@ -282,22 +282,18 @@ class ExportService:
         df_export = df[available_columns].copy()
         
         # Formatage consommation
-        if 'consumption_kwh' in df_export.columns:
-            df_export['consumption_kwh'] = df_export['consumption_kwh'].round(4)
+        if 'y' in df_export.columns:
+            df_export['y'] = df_export['y'].round(4)
         
-        # Formatage surface
-        if 'surface_area_m2' in df_export.columns:
-            df_export['surface_area_m2'] = df_export['surface_area_m2'].round(1)
-        
-        # Tri par building_id puis timestamp
-        if 'building_id' in df_export.columns and 'timestamp' in df_export.columns:
-            df_export = df_export.sort_values(['building_id', 'timestamp']).reset_index(drop=True)
+        # Tri par unique_id puis timestamp
+        if 'unique_id' in df_export.columns and 'timestamp' in df_export.columns:
+            df_export = df_export.sort_values(['unique_id', 'timestamp']).reset_index(drop=True)
         
         return df_export
     
     def _prepare_weather_dataframe(self, weather_data: pd.DataFrame) -> pd.DataFrame:
         """
-        Prépare le DataFrame météorologique pour export
+        Prépare le DataFrame météorologique pour export (INCHANGÉ)
         
         Args:
             weather_data: DataFrame météo brut
@@ -334,6 +330,7 @@ class ExportService:
     def _prepare_water_dataframe(self, water_data: pd.DataFrame) -> pd.DataFrame:
         """
         Prépare le DataFrame de consommation d'eau pour export
+        NOUVELLE STRUCTURE: ['unique_id', 'timestamp', 'y', 'frequency']
         
         Args:
             water_data: DataFrame de consommation d'eau brut
@@ -345,12 +342,10 @@ class ExportService:
         
         # Sélection des colonnes pour export eau
         water_export_columns = [
-            'building_id',
+            'unique_id',
             'timestamp',
-            'water_consumption_liters',
-            'building_type',
-            'surface_area_m2',
-            'consumption_intensity_l_m2'
+            'y',
+            'frequency'
         ]
         
         # Garder seulement les colonnes existantes
@@ -358,20 +353,12 @@ class ExportService:
         df_export = df[available_columns].copy()
         
         # Formatage consommation eau
-        if 'water_consumption_liters' in df_export.columns:
-            df_export['water_consumption_liters'] = df_export['water_consumption_liters'].round(2)
+        if 'y' in df_export.columns:
+            df_export['y'] = df_export['y'].round(4)
         
-        # Formatage intensité eau
-        if 'consumption_intensity_l_m2' in df_export.columns:
-            df_export['consumption_intensity_l_m2'] = df_export['consumption_intensity_l_m2'].round(4)
-        
-        # Formatage surface
-        if 'surface_area_m2' in df_export.columns:
-            df_export['surface_area_m2'] = df_export['surface_area_m2'].round(1)
-        
-        # Tri par building_id puis timestamp
-        if 'building_id' in df_export.columns and 'timestamp' in df_export.columns:
-            df_export = df_export.sort_values(['building_id', 'timestamp']).reset_index(drop=True)
+        # Tri par unique_id puis timestamp
+        if 'unique_id' in df_export.columns and 'timestamp' in df_export.columns:
+            df_export = df_export.sort_values(['unique_id', 'timestamp']).reset_index(drop=True)
         
         return df_export
     
