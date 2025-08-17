@@ -1,13 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-GÉNÉRATEURS DE DONNÉES - CORE MODULE
-====================================
+GÉNÉRATEURS DE DONNÉES - CORE MODULE - VERSION MODIFIÉE
+=======================================================
 
 Modules core pour la génération des données électriques, météorologiques et eau.
-ElectricityGenerator : pour électricité
- WeatherGenerator : pour météo
- WaterGenerator : pour eau
+NOUVELLE STRUCTURE: ['unique_id', 'timestamp', 'y', 'frequency']
 """
 
 import time
@@ -70,7 +68,7 @@ class ElectricityGenerator:
             
             for building in buildings:
                 building_consumption = self._generate_building_consumption_series(
-                    building, date_range
+                    building, date_range, frequency
                 )
                 consumption_data.extend(building_consumption)
             
@@ -103,7 +101,8 @@ class ElectricityGenerator:
     def _generate_building_consumption_series(
         self, 
         building: Dict, 
-        date_range: pd.DatetimeIndex
+        date_range: pd.DatetimeIndex,
+        frequency: str
     ) -> List[Dict]:
         """
         Génère la série de consommation pour un bâtiment
@@ -111,13 +110,14 @@ class ElectricityGenerator:
         Args:
             building: Données du bâtiment
             date_range: Index temporel
+            frequency: Fréquence d'échantillonnage
             
         Returns:
             List[Dict]: Points de consommation
         """
         building_type = building.get('building_type', 'residential')
         surface_area = building.get('surface_area_m2', 100)
-        building_id = building['id']
+        building_id = building.get('unique_id') or building.get('id', 'unknown')
         
         # Consommation de base
         base_consumption = self._calculate_base_consumption(building_type, surface_area)
@@ -141,11 +141,10 @@ class ElectricityGenerator:
                           random_factor)
             
             consumption_points.append({
-                'building_id': building_id,
+                'unique_id': building_id,
                 'timestamp': timestamp,
-                'consumption_kwh': max(0, consumption),
-                'building_type': building_type,
-                'surface_area_m2': surface_area
+                'y': max(0, consumption),
+                'frequency': frequency
             })
         
         return consumption_points
@@ -520,7 +519,7 @@ class WaterGenerator:
             
             for building in buildings:
                 building_water = self._generate_building_water_series(
-                    building, date_range
+                    building, date_range, frequency
                 )
                 water_data.extend(building_water)
             
@@ -553,7 +552,8 @@ class WaterGenerator:
     def _generate_building_water_series(
         self, 
         building: Dict, 
-        date_range: pd.DatetimeIndex
+        date_range: pd.DatetimeIndex,
+        frequency: str
     ) -> List[Dict]:
         """
         Génère la série de consommation d'eau pour un bâtiment
@@ -561,13 +561,14 @@ class WaterGenerator:
         Args:
             building: Données du bâtiment
             date_range: Index temporel
+            frequency: Fréquence d'échantillonnage
             
         Returns:
             List[Dict]: Points de consommation d'eau
         """
         building_type = building.get('building_type', 'residential')
         surface_area = building.get('surface_area_m2', 100)
-        building_id = building['id']
+        building_id = building.get('unique_id') or building.get('id', 'unknown')
         
         # Consommation de base eau
         base_water_consumption = self._calculate_base_water_consumption(building_type, surface_area)
@@ -591,12 +592,10 @@ class WaterGenerator:
                                random_factor)
             
             water_points.append({
-                'building_id': building_id,
+                'unique_id': building_id,
                 'timestamp': timestamp,
-                'water_consumption_liters': max(0, water_consumption),
-                'building_type': building_type,
-                'surface_area_m2': surface_area,
-                'consumption_intensity_l_m2': water_consumption / surface_area if surface_area > 0 else 0
+                'y': max(0, water_consumption),
+                'frequency': frequency
             })
         
         return water_points
