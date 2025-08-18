@@ -12,11 +12,11 @@ import time
 import logging
 import math
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from config import MalaysiaConfig, WeatherConfig
+from config import MalaysiaConfig
 from src.utils.helpers import generate_unique_id
 
 logger = logging.getLogger(__name__)
@@ -78,9 +78,9 @@ class EnhancedElectricityGenerator:
             generation_time = time.time() - start_time
             logger.info(f"✅ {len(consumption_data)} points générés en {generation_time:.1f}s")
             
-            # Statistiques géométriques
-            total_precise_area = sum(b['precise_surface_area_m2'] for b in processed_buildings)
-            avg_floors = sum(b['floors_count'] for b in processed_buildings) / len(processed_buildings)
+            # Statistiques géométriques (CORRIGÉ: utilisation de .get())
+            total_precise_area = sum(b.get('precise_surface_area_m2', 100.0) for b in processed_buildings)
+            avg_floors = sum(b.get('floors_count', 1) for b in processed_buildings) / len(processed_buildings)
             
             return {
                 'success': True,
@@ -95,8 +95,8 @@ class EnhancedElectricityGenerator:
                     'geometry_statistics': {
                         'total_precise_surface_m2': round(total_precise_area, 1),
                         'average_floors': round(avg_floors, 1),
-                        'buildings_with_geometry': sum(1 for b in processed_buildings if b['has_precise_geometry']),
-                        'buildings_with_floor_data': sum(1 for b in processed_buildings if b['floors_count'] > 1)
+                        'buildings_with_geometry': sum(1 for b in processed_buildings if b.get('has_precise_geometry', False)),
+                        'buildings_with_floor_data': sum(1 for b in processed_buildings if b.get('floors_count', 1) > 1)
                     }
                 }
             }
@@ -124,7 +124,7 @@ class EnhancedElectricityGenerator:
         
         for i, building in enumerate(buildings):
             try:
-                # Extraction des données de base
+                # Extraction des données de base (CORRIGÉ: utilisation de .get())
                 building_id = (building.get('unique_id') or 
                              building.get('id') or 
                              building.get('building_id') or 
@@ -158,7 +158,7 @@ class EnhancedElectricityGenerator:
                     'shape_factor': shape_factor
                 }
                 
-                # Construction du bâtiment enrichi
+                # Construction du bâtiment enrichi (CORRIGÉ: ajout de has_precise_geometry)
                 enhanced_building = {
                     'unique_id': building_id,
                     'building_type': building_type,
@@ -169,6 +169,7 @@ class EnhancedElectricityGenerator:
                     'floors_count': floors_count,
                     'zone_name': building.get('zone_name', 'unknown'),
                     'source': building.get('source', 'osm'),
+                    'has_precise_geometry': has_geometry,  # AJOUTÉ: clé manquante
                     'geometry_metadata': geometry_metadata,
                     # Données originales conservées
                     'original_geometry': building.get('geometry', []),
@@ -180,7 +181,7 @@ class EnhancedElectricityGenerator:
                 
             except Exception as e:
                 logger.warning(f"Erreur prétraitement bâtiment {i}: {e}")
-                # Bâtiment de fallback
+                # Bâtiment de fallback (CORRIGÉ: ajout de has_precise_geometry)
                 fallback_building = {
                     'unique_id': f'fallback_{i}',
                     'building_type': 'residential',
@@ -191,6 +192,7 @@ class EnhancedElectricityGenerator:
                     'floors_count': 1,
                     'zone_name': 'unknown',
                     'source': 'fallback',
+                    'has_precise_geometry': False,  # AJOUTÉ: clé manquante
                     'geometry_metadata': {
                         'has_precise_geometry': False,
                         'precise_surface_area_m2': 100.0,
@@ -201,9 +203,9 @@ class EnhancedElectricityGenerator:
                 }
                 processed_buildings.append(fallback_building)
         
-        # Statistiques de prétraitement
-        with_geometry = sum(1 for b in processed_buildings if b['geometry_metadata']['has_precise_geometry'])
-        multi_floor = sum(1 for b in processed_buildings if b['floors_count'] > 1)
+        # Statistiques de prétraitement (CORRIGÉ: utilisation de .get())
+        with_geometry = sum(1 for b in processed_buildings if b.get('has_precise_geometry', False))
+        multi_floor = sum(1 for b in processed_buildings if b.get('floors_count', 1) > 1)
         
         logger.info(f"✅ Prétraitement terminé: {with_geometry}/{len(processed_buildings)} avec géométrie précise")
         logger.info(f"   📏 {multi_floor}/{len(processed_buildings)} bâtiments multi-étages")
@@ -411,11 +413,12 @@ class EnhancedElectricityGenerator:
         Returns:
             List[Dict]: Points de consommation
         """
-        building_type = building['building_type']
-        precise_surface = building['precise_surface_area_m2']
-        floors_count = building['floors_count']
-        shape_factor = building['geometry_metadata']['shape_factor']
-        building_id = building['unique_id']
+        # CORRIGÉ: utilisation de .get() pour tous les accès
+        building_type = building.get('building_type', 'residential')
+        precise_surface = building.get('precise_surface_area_m2', 100.0)
+        floors_count = building.get('floors_count', 1)
+        shape_factor = building.get('geometry_metadata', {}).get('shape_factor', 1.0)
+        building_id = building.get('unique_id', 'unknown')
         
         # Consommation de base avec surface précise
         base_consumption = self._calculate_enhanced_base_consumption(
@@ -566,7 +569,7 @@ class EnhancedElectricityGenerator:
     
     # Méthodes reprises du générateur standard
     def _get_hourly_factor(self, hour: int, building_type: str) -> float:
-        """Facteur de variation horaire (identique au générateur standard)"""
+        """Facteur de variation horaire"""
         if building_type == 'residential':
             if 6 <= hour <= 8 or 18 <= hour <= 22:
                 return 1.5
@@ -583,7 +586,7 @@ class EnhancedElectricityGenerator:
             return 1.0 + 0.3 * np.sin((hour - 6) * np.pi / 12)
     
     def _get_daily_factor(self, day_of_week: int, building_type: str) -> float:
-        """Facteur de variation journalière (identique au générateur standard)"""
+        """Facteur de variation journalière"""
         if building_type == 'residential':
             return 1.2 if day_of_week >= 5 else 1.0
         elif building_type in ['office', 'commercial']:
@@ -592,228 +595,10 @@ class EnhancedElectricityGenerator:
             return 1.0
     
     def _get_seasonal_factor(self, month: int) -> float:
-        """Facteur saisonnier (identique au générateur standard)"""
+        """Facteur saisonnier"""
         if 6 <= month <= 8:
             return 1.3
         elif 11 <= month <= 12 or 1 <= month <= 2:
             return 0.9
         else:
             return 1.0
-
-
-# ==============================================================================
-# FONCTIONS UTILITAIRES GÉOMÉTRIQUES
-# ==============================================================================
-
-def validate_building_geometry(geometry: List[Dict]) -> Dict:
-    """
-    Valide la géométrie d'un bâtiment
-    
-    Args:
-        geometry: Liste des points du polygone
-        
-    Returns:
-        Dict: Résultat de validation avec statistiques
-    """
-    if not geometry or not isinstance(geometry, list):
-        return {
-            'valid': False,
-            'error': 'Géométrie manquante ou invalide',
-            'points_count': 0
-        }
-    
-    valid_points = 0
-    lat_sum = 0
-    lon_sum = 0
-    
-    for point in geometry:
-        if isinstance(point, dict) and 'lat' in point and 'lon' in point:
-            try:
-                lat = float(point['lat'])
-                lon = float(point['lon'])
-                
-                # Validation coordonnées Malaysia
-                if 0.5 <= lat <= 7.5 and 99.0 <= lon <= 120.0:
-                    valid_points += 1
-                    lat_sum += lat
-                    lon_sum += lon
-            except (ValueError, TypeError):
-                continue
-    
-    if valid_points < 3:
-        return {
-            'valid': False,
-            'error': 'Moins de 3 points valides pour former un polygone',
-            'points_count': valid_points
-        }
-    
-    # Calcul du centroïde
-    centroid_lat = lat_sum / valid_points
-    centroid_lon = lon_sum / valid_points
-    
-    return {
-        'valid': True,
-        'points_count': valid_points,
-        'total_points': len(geometry),
-        'valid_points_ratio': valid_points / len(geometry),
-        'centroid': {
-            'latitude': round(centroid_lat, 6),
-            'longitude': round(centroid_lon, 6)
-        }
-    }
-
-
-def calculate_building_compactness(geometry: List[Dict]) -> float:
-    """
-    Calcule l'indice de compacité d'un bâtiment (0-1, 1 = cercle parfait)
-    
-    Args:
-        geometry: Géométrie du bâtiment
-        
-    Returns:
-        float: Indice de compacité
-    """
-    if not geometry or len(geometry) < 3:
-        return 0.5  # Valeur par défaut
-    
-    try:
-        # Calcul du périmètre et de l'aire
-        coordinates = []
-        for point in geometry:
-            if 'lat' in point and 'lon' in point:
-                coordinates.append((point['lat'], point['lon']))
-        
-        if len(coordinates) < 3:
-            return 0.5
-        
-        # Calcul aire (shoelace)
-        area = 0.0
-        n = len(coordinates)
-        for i in range(n):
-            j = (i + 1) % n
-            area += coordinates[i][0] * coordinates[j][1]
-            area -= coordinates[j][0] * coordinates[i][1]
-        area = abs(area) / 2.0
-        
-        # Calcul périmètre approximatif
-        perimeter = 0.0
-        for i in range(n):
-            j = (i + 1) % n
-            dx = coordinates[j][0] - coordinates[i][0]
-            dy = coordinates[j][1] - coordinates[i][1]
-            perimeter += math.sqrt(dx*dx + dy*dy)
-        
-        if area <= 0 or perimeter <= 0:
-            return 0.5
-        
-        # Indice de compacité = 4π × aire / périmètre²
-        compactness = (4 * math.pi * area) / (perimeter * perimeter)
-        return min(1.0, max(0.0, compactness))
-        
-    except Exception:
-        return 0.5
-
-
-def analyze_building_geometry_statistics(buildings: List[Dict]) -> Dict:
-    """
-    Analyse les statistiques géométriques d'une liste de bâtiments
-    
-    Args:
-        buildings: Liste des bâtiments avec géométrie
-        
-    Returns:
-        Dict: Statistiques géométriques complètes
-    """
-    if not buildings:
-        return {'error': 'Aucun bâtiment à analyser'}
-    
-    # Compteurs et accumulateurs
-    with_geometry = 0
-    with_floors = 0
-    total_surface_precise = 0
-    total_surface_fallback = 0
-    total_floors = 0
-    
-    surfaces_precise = []
-    surfaces_fallback = []
-    floors_counts = []
-    compactness_values = []
-    
-    for building in buildings:
-        # Géométrie
-        geometry = building.get('geometry', [])
-        if geometry and len(geometry) >= 3:
-            with_geometry += 1
-            
-            # Calcul surface précise
-            generator = EnhancedElectricityGenerator()
-            precise_area, has_geom = generator._calculate_precise_area_from_polygon(building)
-            if has_geom:
-                surfaces_precise.append(precise_area)
-                total_surface_precise += precise_area
-        
-        # Surface de fallback
-        fallback_area = building.get('surface_area_m2', 100.0)
-        surfaces_fallback.append(fallback_area)
-        total_surface_fallback += fallback_area
-        
-        # Étages
-        floors = building.get('floors_count') or building.get('levels') or 1
-        try:
-            floors = int(floors)
-            if floors > 1:
-                with_floors += 1
-            floors_counts.append(floors)
-            total_floors += floors
-        except:
-            floors_counts.append(1)
-            total_floors += 1
-        
-        # Compacité
-        if geometry:
-            compactness = calculate_building_compactness(geometry)
-            compactness_values.append(compactness)
-    
-    # Calculs statistiques
-    geometry_stats = {
-        'total_buildings': len(buildings),
-        'with_geometry': with_geometry,
-        'with_floors_data': with_floors,
-        'geometry_coverage_percent': round(with_geometry / len(buildings) * 100, 1),
-        'multi_floor_percent': round(with_floors / len(buildings) * 100, 1),
-        
-        'surface_statistics': {
-            'precise_surfaces': {
-                'count': len(surfaces_precise),
-                'total_m2': round(total_surface_precise, 1),
-                'average_m2': round(total_surface_precise / len(surfaces_precise), 1) if surfaces_precise else 0,
-                'min_m2': round(min(surfaces_precise), 1) if surfaces_precise else 0,
-                'max_m2': round(max(surfaces_precise), 1) if surfaces_precise else 0
-            },
-            'fallback_surfaces': {
-                'total_m2': round(total_surface_fallback, 1),
-                'average_m2': round(total_surface_fallback / len(buildings), 1),
-                'min_m2': round(min(surfaces_fallback), 1),
-                'max_m2': round(max(surfaces_fallback), 1)
-            }
-        },
-        
-        'floors_statistics': {
-            'total_floors': total_floors,
-            'average_floors': round(total_floors / len(buildings), 2),
-            'min_floors': min(floors_counts),
-            'max_floors': max(floors_counts),
-            'single_floor_count': floors_counts.count(1),
-            'multi_floor_count': sum(1 for f in floors_counts if f > 1)
-        },
-        
-        'compactness_statistics': {
-            'average_compactness': round(sum(compactness_values) / len(compactness_values), 3) if compactness_values else 0,
-            'min_compactness': round(min(compactness_values), 3) if compactness_values else 0,
-            'max_compactness': round(max(compactness_values), 3) if compactness_values else 0,
-            'compact_buildings_count': sum(1 for c in compactness_values if c > 0.7),
-            'elongated_buildings_count': sum(1 for c in compactness_values if c < 0.3)
-        }
-    }
-    
-    return geometry_stats

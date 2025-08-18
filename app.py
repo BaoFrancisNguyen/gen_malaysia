@@ -191,3 +191,173 @@ def api_generate_data():
                     'summary': result['session_info']['summary']
                 }
             }
+            
+            return jsonify(response_data)
+        else:
+            return jsonify(result), 400
+            
+    except Exception as e:
+        logger.error(f"❌ Erreur génération améliorée: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/export', methods=['POST'])
+def api_export_data():
+    """API: Exporte les données avec métadonnées géométriques"""
+    try:
+        data = request.get_json()
+        export_format = data.get('format', 'csv')
+        base_filename = data.get('filename')
+        
+        # Vérifier qu'il y a des données à exporter
+        has_buildings = len(app_cache['buildings']) > 0
+        has_consumption = app_cache['consumption_data'] is not None
+        has_weather = app_cache['weather_data'] is not None
+        has_water = app_cache['water_data'] is not None
+        
+        if not has_buildings:
+            return jsonify({
+                'success': False,
+                'error': 'Aucun bâtiment à exporter'
+            }), 400
+        
+        # Export via le service amélioré
+        result = export_service.export_all_datasets(
+            buildings=app_cache['buildings'],
+            consumption_data=app_cache['consumption_data'] if has_consumption else None,
+            weather_data=app_cache['weather_data'] if has_weather else None,
+            water_data=app_cache['water_data'] if has_water else None,
+            export_format=export_format,
+            base_filename=base_filename
+        )
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur export amélioré: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/download/<filename>')
+def api_download_file(filename):
+    """API: Télécharge un fichier exporté"""
+    try:
+        file_path = AppConfig.EXPORTS_DIR / filename
+        
+        if not file_path.exists():
+            return jsonify({'error': 'Fichier non trouvé'}), 404
+        
+        return send_file(file_path, as_attachment=True)
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur téléchargement: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/status', methods=['GET'])
+def api_get_status():
+    """API: Statut de l'application améliorée"""
+    try:
+        status = {
+            'success': True,
+            'version': '3.1.0-enhanced',
+            'enhanced_features': True,
+            'geometry_processing': True,
+            'cache': {
+                'buildings_loaded': len(app_cache['buildings']),
+                'consumption_points': len(app_cache['consumption_data']) if app_cache['consumption_data'] is not None else 0,
+                'weather_points': len(app_cache['weather_data']) if app_cache['weather_data'] is not None else 0,
+                'water_points': len(app_cache['water_data']) if app_cache['water_data'] is not None else 0
+            },
+            'geometry_statistics': app_cache.get('geometry_statistics', {}),
+            'services': {
+                'osm_service': 'active',
+                'generation_service': 'active', 
+                'export_service': 'active'
+            },
+            'capabilities': {
+                'administrative_relations': True,
+                'precise_geometry_extraction': True,
+                'floors_metadata': True,
+                'enhanced_validation': True
+            }
+        }
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"❌ Erreur statut: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ==============================================================================
+# FONCTIONS UTILITAIRES
+# ==============================================================================
+
+def _analyze_cache_geometry_statistics(buildings):
+    """Analyse les statistiques géométriques du cache"""
+    if not buildings:
+        return {
+            'with_precise_geometry': 0,
+            'with_floors_data': 0,
+            'total_buildings': 0
+        }
+    
+    with_geometry = sum(1 for b in buildings if b.get('has_precise_geometry', False))
+    with_floors = sum(1 for b in buildings if b.get('floors_count', 1) > 1)
+    
+    return {
+        'total_buildings': len(buildings),
+        'with_precise_geometry': with_geometry,
+        'with_floors_data': with_floors,
+        'geometry_rate': round(with_geometry / len(buildings), 3),
+        'floors_rate': round(with_floors / len(buildings), 3)
+    }
+
+
+def _cache_health_check():
+    """Vérifie la santé du cache"""
+    return {
+        'buildings_loaded': len(app_cache['buildings']),
+        'consumption_cached': app_cache['consumption_data'] is not None,
+        'weather_cached': app_cache['weather_data'] is not None,
+        'water_cached': app_cache['water_data'] is not None,
+        'enhanced_features_active': app_cache['enhanced_features_active']
+    }
+
+
+# ==============================================================================
+# GESTION D'ERREURS
+# ==============================================================================
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Endpoint non trouvé'}), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Erreur interne: {error}")
+    return jsonify({'error': 'Erreur interne du serveur'}), 500
+
+
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({'error': 'Requête invalide'}), 400
+
+
+# ==============================================================================
+# DÉMARRAGE DE L'APPLICATION
+# ==============================================================================
+
+if __name__ == '__main__':
+    logger.info("🚀 Démarrage Malaysia Electricity Generator v3.1.0 Enhanced")
+    logger.info("🏗️ Architecture: modulaire avec géométrie précise")
+    logger.info("📐 Fonctionnalités: extraction polygones OSM + métadonnées étages")
+    
+    app.run(
+        host='127.0.0.1',
+        port=5000,
+        debug=True,
+        threaded=True
+    )
